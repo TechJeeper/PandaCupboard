@@ -10,7 +10,7 @@ Built from the PaxxTouch board support (ESP32-S3, LVGL, GT911).
 
 ### Option A: Web flasher (recommended)
 
-1. Open **[PandaFarm Web Flasher](https://pandacupboard.techjeeper.com/flasher/)** in Chrome or Edge
+1. Open **[PandaFarm Web Flasher](https://pandafarm.techjeeper.com/flasher/)** in Chrome or Edge
 2. Connect USB, click **Connect USB**, then **Flash PandaFarm**
 
 See [docs/flasher/README.md](docs/flasher/README.md) for self-hosting on GitHub Pages.

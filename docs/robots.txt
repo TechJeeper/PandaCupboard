@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://pandacupboard.techjeeper.com/sitemap.xml
+Sitemap: https://pandafarm.techjeeper.com/sitemap.xml

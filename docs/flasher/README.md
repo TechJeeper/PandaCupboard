@@ -7,7 +7,7 @@ Flashes **PandaFarm** — Bambu Lab farm dashboard.
 ## Live URL
 
 ```
-https://pandacupboard.techjeeper.com/flasher/
+https://pandafarm.techjeeper.com/flasher/
 ```
 
 ## GitHub Pages setup
