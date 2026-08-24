@@ -3,26 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PandaCupboard Web Flasher</title>
-  <meta name="description" content="Flash PandaCupboard v0.1.0 to BTT K-Touch or PandaTouch — Bambu Lab cupboard dashboard.">
-  <meta name="keywords" content="PandaCupboard, Bambu Lab, BTT K-Touch, PandaTouch, Web Flasher, Firmware, 3D Printer">
+  <title>PandaCupboard Web Flasher — flash Bambu firmware to Panda Touch</title>
+  <meta name="description" content="Flash PandaCupboard v0.1.0 to a BIGTREETECH Panda Touch or K-Touch from Chrome or Edge. Bambu Lab cupboard dashboard with pause, resume, and stop.">
+  <meta name="keywords" content="PandaCupboard, web flasher, Bambu Lab, Panda Touch, K-Touch, BIGTREETECH, ESP32-S3, firmware">
   <meta name="author" content="TechJeeper Designs">
-  <meta name="robots" content="index, follow">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="color-scheme" content="dark">
   <link rel="canonical" href="https://techjeeper.github.io/PandaCupboard/flasher/">
+  <link rel="icon" href="logo.jpg" type="image/jpeg">
+  <link rel="apple-touch-icon" href="screen1.jpg">
+  <link rel="sitemap" type="application/xml" href="../sitemap.xml">
 
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PandaCupboard">
+  <meta property="og:locale" content="en_US">
   <meta property="og:url" content="https://techjeeper.github.io/PandaCupboard/flasher/">
   <meta property="og:title" content="PandaCupboard Web Flasher">
-  <meta property="og:description" content="Flash PandaCupboard to BTT K-Touch or PandaTouch — Bambu Lab cupboard dashboard.">
-  <meta property="og:image" content="https://techjeeper.github.io/PandaCupboard/flasher/logo.jpg">
+  <meta property="og:description" content="Flash PandaCupboard to BTT Panda Touch or K-Touch from the browser. Bambu Lab cupboard dashboard firmware.">
+  <meta property="og:image" content="https://techjeeper.github.io/PandaCupboard/flasher/screen1.jpg">
+  <meta property="og:image:alt" content="PandaCupboard cupboard list on a BIGTREETECH Panda Touch">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="701">
 
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://techjeeper.github.io/PandaCupboard/flasher/">
-  <meta property="twitter:title" content="PandaCupboard Web Flasher">
-  <meta property="twitter:description" content="Flash PandaCupboard to BTT K-Touch or PandaTouch — Bambu Lab cupboard dashboard.">
-  <meta property="twitter:image" content="https://techjeeper.github.io/PandaCupboard/flasher/logo.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PandaCupboard Web Flasher">
+  <meta name="twitter:description" content="Flash Bambu cupboard firmware to a Panda Touch or K-Touch in Chrome or Edge.">
+  <meta name="twitter:image" content="https://techjeeper.github.io/PandaCupboard/flasher/screen1.jpg">
+  <meta name="twitter:image:alt" content="PandaCupboard cupboard list on a BIGTREETECH Panda Touch">
 
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "PandaCupboard Web Flasher",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "browserRequirements": "Requires Chrome or Edge with Web Serial",
+    "url": "https://techjeeper.github.io/PandaCupboard/flasher/",
+    "isAccessibleForFree": true,
+    "author": {
+      "@type": "Organization",
+      "name": "TechJeeper Designs",
+      "url": "https://techjeeper.com/"
+    }
+  }
+  </script>
+  <script data-goatcounter="https://pandacupboard.goatcounter.com/count"
+          async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -38,18 +67,18 @@
         ·
         <a href="#screenshots">Screenshots</a>
       </p>
-      <img src="logo.jpg" alt="PandaCupboard" class="header-logo" width="300" height="180">
+      <img src="logo.jpg" alt="PandaCupboard logo: a panda in a cupboard" class="header-logo" width="300" height="180">
     </header>
 
     <section class="card" id="screenshots">
       <h2>Screenshots</h2>
       <div class="shot-grid">
         <figure>
-          <img src="screen1.jpg" alt="PandaCupboard cupboard list on a Panda Touch" width="1024" height="701">
+          <img src="screen1.jpg" alt="PandaCupboard cupboard list showing device name, task, and print status on a Panda Touch" width="1024" height="701">
           <figcaption>Cupboard list</figcaption>
         </figure>
         <figure>
-          <img src="screen2.jpg" alt="PandaCupboard printer detail with pause, stop, and reprint" width="1024" height="701">
+          <img src="screen2.jpg" alt="PandaCupboard printer detail with pause, resume, stop, and reprint on a Panda Touch" width="1024" height="701">
           <figcaption>Printer detail</figcaption>
         </figure>
       </div>
@@ -147,6 +176,9 @@
     </footer>
   </div>
 
-  <script type="module" src="app.js?v=1"></script>
+  <script type="module" src="app.js?v=2"></script>
+  <noscript>
+    <img src="https://pandacupboard.goatcounter.com/count?p=/flasher/" alt="">
+  </noscript>
 </body>
 </html>

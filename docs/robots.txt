@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://techjeeper.github.io/PandaCupboard/sitemap.xml

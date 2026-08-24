@@ -121,9 +121,12 @@ button, .btn {
   color: white;
   transition: all 0.2s ease;
   box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+  text-decoration: none;
+  display: inline-block;
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled),
+a.btn:hover {
   background: var(--primary-hover);
   transform: translateY(-1px);
   box-shadow: 0 6px 8px -1px rgba(37, 99, 235, 0.3);
