@@ -1,6 +1,6 @@
-# PandaCupboard
+# PandaFarm
 
-Custom firmware for **BIGTREETECH K-Touch** and **PandaTouch** that shows a Bambu Lab cupboard dashboard, styled like Bambu Studio’s device list.
+Custom firmware for **BIGTREETECH K-Touch** and **PandaTouch** that shows a Bambu Lab farm dashboard, styled like Bambu Studio’s device list.
 
 Created by [TechJeeper Designs](https://techjeeper.com/).
 
@@ -10,8 +10,8 @@ Built from the PaxxTouch board support (ESP32-S3, LVGL, GT911).
 
 ### Option A: Web flasher (recommended)
 
-1. Open **[PandaCupboard Web Flasher](https://techjeeper.github.io/PandaCupboard/flasher/)** in Chrome or Edge
-2. Connect USB, click **Connect USB**, then **Flash PandaCupboard**
+1. Open **[PandaFarm Web Flasher](https://pandacupboard.techjeeper.com/flasher/)** in Chrome or Edge
+2. Connect USB, click **Connect USB**, then **Flash PandaFarm**
 
 See [docs/flasher/README.md](docs/flasher/README.md) for self-hosting on GitHub Pages.
 
@@ -39,9 +39,9 @@ Package bins for a GitHub Release:
 
 ## First run
 
-1. Flash PandaCupboard
+1. Flash PandaFarm
 2. **Gear → WiFi Setup** — connect to your LAN
 3. **Gear → Printers** — add a printer (name, IP, access code)
-4. Tap a printer on the cupboard list for job details and controls
+4. Tap a printer on the farm list for job details and controls
 
 The panel and printers must be on the same LAN. This image replaces stock Panda Touch firmware — keep a BTT `.bin` / `.img` if you want to restore official firmware.

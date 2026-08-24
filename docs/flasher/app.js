@@ -275,7 +275,7 @@ async function flashDevice() {
 
     await state.esploader.after("hard_reset");
     setProgress(100, true);
-    setStatus("Flash complete! PandaCupboard is rebooting.", "ok");
+    setStatus("Flash complete! PandaFarm is rebooting.", "ok");
     log("Success — firmware written. Device reset.");
     if (window.goatcounter && window.goatcounter.count) {
       window.goatcounter.count({ path: "flash-success", title: "Flash Success", event: true });

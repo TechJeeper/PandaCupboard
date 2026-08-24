@@ -112,7 +112,7 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     paxx_disable_input(titleBar_);
 
     titleLbl_ = lv_label_create(titleBar_);
-    lv_label_set_text(titleLbl_, "PandaCupboard");
+    lv_label_set_text(titleLbl_, "PandaFarm");
     lv_obj_set_style_text_font(titleLbl_, PaxxTheme::fontTitle(), LV_PART_MAIN);
     lv_obj_set_width(titleLbl_, 420);
     lv_label_set_long_mode(titleLbl_, LV_LABEL_LONG_CLIP);
@@ -1220,10 +1220,10 @@ void SettingsScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_align(hintLbl_, LV_ALIGN_TOP_MID, 0, 70);
     lv_label_set_long_mode(hintLbl_, LV_LABEL_LONG_WRAP);
     lv_label_set_text(hintLbl_,
-                      "PandaCupboard " PANDACUPBOARD_VERSION "\n"
-                      "PandaTouch / K-Touch Bambu Lab cupboard dashboard.\n\n"
+                      "PandaFarm " PANDACUPBOARD_VERSION "\n"
+                      "PandaTouch / K-Touch Bambu Lab farm dashboard.\n\n"
                       "Created by TechJeeper Designs\n\n"
                       "Connect printers with IP + LAN access code.\n"
                       "MQTT/TLS 8883 user bblp. SSDP discovery on UDP 1990.\n"
-                      "Cupboard sorts by Device Status; active jobs with higher completion stay on top.");
+                      "Farm sorts by Device Status; active jobs with higher completion stay on top.");
 }

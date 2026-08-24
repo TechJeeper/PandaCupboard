@@ -1,12 +1,12 @@
 {
-  "name": "PandaCupboard",
+  "name": "PandaFarm",
   "version": "0.2.0",
-  "description": "Bambu Lab cupboard dashboard for BTT K-Touch / PandaTouch — Studio-style fleet list with pause, resume, stop, and LAN MQTT",
+  "description": "Bambu Lab farm dashboard for BTT K-Touch / PandaTouch — Studio-style farm list with pause, resume, stop, and LAN MQTT",
   "chip": "ESP32-S3",
   "hardware": "BTT K-Touch / PandaTouch (ESP32-S3, 8 MB PSRAM)",
   "github": {
     "owner": "TechJeeper",
-    "repo": "PandaCupboard"
+    "repo": "PandaFarm"
   },
   "flash": {
     "mode": "keep",
@@ -21,15 +21,15 @@
   },
   "firmwareCdn": {
     "owner": "TechJeeper",
-    "repo": "PandaCupboard",
+    "repo": "PandaFarm",
     "ref": "main",
     "path": "docs/flasher/firmware/"
   },
   "files": [
-    { "asset": "pandacupboard-bootloader.bin", "offset": 0 },
-    { "asset": "pandacupboard-partitions.bin", "offset": 32768 },
-    { "asset": "pandacupboard-boot_app0.bin", "offset": 57344, "optional": true },
-    { "asset": "pandacupboard-firmware.bin", "offset": 65536 }
+    { "asset": "pandafarm-bootloader.bin", "offset": 0 },
+    { "asset": "pandafarm-partitions.bin", "offset": 32768 },
+    { "asset": "pandafarm-boot_app0.bin", "offset": 57344, "optional": true },
+    { "asset": "pandafarm-firmware.bin", "offset": 65536 }
   ],
   "localFallback": {
     "bootloader.bin": 0,

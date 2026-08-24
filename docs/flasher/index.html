@@ -3,45 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PandaCupboard Web Flasher — flash Bambu firmware to Panda Touch</title>
-  <meta name="description" content="Flash PandaCupboard v0.2.0 to a BIGTREETECH Panda Touch or K-Touch from Chrome or Edge. Bambu Lab cupboard dashboard with pause, resume, and stop.">
-  <meta name="keywords" content="PandaCupboard, web flasher, Bambu Lab, Panda Touch, K-Touch, BIGTREETECH, ESP32-S3, firmware">
+  <title>PandaFarm Web Flasher — flash Bambu firmware to Panda Touch</title>
+  <meta name="description" content="Flash PandaFarm v0.2.0 to a BIGTREETECH Panda Touch or K-Touch from Chrome or Edge. Bambu Lab farm dashboard with pause, resume, and stop.">
+  <meta name="keywords" content="PandaFarm, web flasher, Bambu Lab, Panda Touch, K-Touch, BIGTREETECH, ESP32-S3, firmware">
   <meta name="author" content="TechJeeper Designs">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#0f172a">
   <meta name="color-scheme" content="dark">
-  <link rel="canonical" href="https://techjeeper.github.io/PandaCupboard/flasher/">
+  <link rel="canonical" href="https://pandacupboard.techjeeper.com/flasher/">
   <link rel="icon" href="logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="screen1.jpg">
   <link rel="sitemap" type="application/xml" href="../sitemap.xml">
 
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="PandaCupboard">
+  <meta property="og:site_name" content="PandaFarm">
   <meta property="og:locale" content="en_US">
-  <meta property="og:url" content="https://techjeeper.github.io/PandaCupboard/flasher/">
-  <meta property="og:title" content="PandaCupboard Web Flasher">
-  <meta property="og:description" content="Flash PandaCupboard to BTT Panda Touch or K-Touch from the browser. Bambu Lab cupboard dashboard firmware.">
-  <meta property="og:image" content="https://techjeeper.github.io/PandaCupboard/flasher/screen1.jpg">
-  <meta property="og:image:alt" content="PandaCupboard cupboard list on a BIGTREETECH Panda Touch">
+  <meta property="og:url" content="https://pandacupboard.techjeeper.com/flasher/">
+  <meta property="og:title" content="PandaFarm Web Flasher">
+  <meta property="og:description" content="Flash PandaFarm to BTT Panda Touch or K-Touch from the browser. Bambu Lab farm dashboard firmware.">
+  <meta property="og:image" content="https://pandacupboard.techjeeper.com/flasher/screen1.jpg">
+  <meta property="og:image:alt" content="PandaFarm farm list on a BIGTREETECH Panda Touch">
   <meta property="og:image:width" content="1024">
   <meta property="og:image:height" content="701">
 
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PandaCupboard Web Flasher">
-  <meta name="twitter:description" content="Flash Bambu cupboard firmware to a Panda Touch or K-Touch in Chrome or Edge.">
-  <meta name="twitter:image" content="https://techjeeper.github.io/PandaCupboard/flasher/screen1.jpg">
-  <meta name="twitter:image:alt" content="PandaCupboard cupboard list on a BIGTREETECH Panda Touch">
+  <meta name="twitter:title" content="PandaFarm Web Flasher">
+  <meta name="twitter:description" content="Flash Bambu farm firmware to a Panda Touch or K-Touch in Chrome or Edge.">
+  <meta name="twitter:image" content="https://pandacupboard.techjeeper.com/flasher/screen1.jpg">
+  <meta name="twitter:image:alt" content="PandaFarm farm list on a BIGTREETECH Panda Touch">
 
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    "name": "PandaCupboard Web Flasher",
+    "name": "PandaFarm Web Flasher",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Windows, macOS, Linux",
     "browserRequirements": "Requires Chrome or Edge with Web Serial",
-    "url": "https://techjeeper.github.io/PandaCupboard/flasher/",
+    "url": "https://pandacupboard.techjeeper.com/flasher/",
     "isAccessibleForFree": true,
     "author": {
       "@type": "Organization",
@@ -56,29 +56,29 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>PandaCupboard Web Flasher</h1>
-      <p>Flash <strong>PandaCupboard</strong> to BTT K-Touch / PandaTouch<br>
-      Bambu Lab cupboard dashboard in a Studio-style list.</p>
+      <h1>PandaFarm Web Flasher</h1>
+      <p>Flash <strong>PandaFarm</strong> to BTT K-Touch / PandaTouch<br>
+      Bambu Lab farm dashboard in a Studio-style list.</p>
       <p><span class="badge" id="versionBadge">loading…</span></p>
       <p class="header-links">
-        <a href="https://github.com/TechJeeper/PandaCupboard" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/TechJeeper/PandaFarm" target="_blank" rel="noopener">GitHub</a>
         ·
-        <a href="https://github.com/TechJeeper/PandaCupboard/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/TechJeeper/PandaFarm/releases" target="_blank" rel="noopener">Releases</a>
         ·
         <a href="#screenshots">Screenshots</a>
       </p>
-      <img src="logo.jpg" alt="PandaCupboard logo: a panda in a cupboard" class="header-logo" width="300" height="180">
+      <img src="logo.jpg" alt="PandaFarm logo: a panda icon" class="header-logo" width="300" height="180">
     </header>
 
     <section class="card" id="screenshots">
       <h2>Screenshots</h2>
       <div class="shot-grid">
         <figure>
-          <img src="screen1.jpg" alt="PandaCupboard cupboard list showing device name, task, and print status on a Panda Touch" width="1024" height="701">
-          <figcaption>Cupboard list</figcaption>
+          <img src="screen1.jpg" alt="PandaFarm farm list showing device name, task, and print status on a Panda Touch" width="1024" height="701">
+          <figcaption>Farm list</figcaption>
         </figure>
         <figure>
-          <img src="screen2.jpg" alt="PandaCupboard printer detail with pause, resume, stop, and reprint on a Panda Touch" width="1024" height="701">
+          <img src="screen2.jpg" alt="PandaFarm printer detail with pause, resume, stop, and reprint on a Panda Touch" width="1024" height="701">
           <figcaption>Printer detail</figcaption>
         </figure>
       </div>
@@ -103,7 +103,7 @@
 
       <div id="panelRelease" style="margin-top:12px">
         <p style="color:var(--muted);font-size:0.9rem;margin:0 0 8px">
-          Loads <code>pandacupboard-*.bin</code> from this page (with a jsDelivr CDN fallback).
+          Loads <code>pandafarm-*.bin</code> from this page (with a jsDelivr CDN fallback).
           Click <strong>Reload firmware</strong> after a new release is published.
         </p>
         <button type="button" class="secondary" id="btnFetchRelease">Reload firmware</button>
@@ -151,7 +151,7 @@
 
       <div class="row" style="margin-top:16px">
         <button type="button" id="btnConnect">1. Connect USB</button>
-        <button type="button" id="btnFlash" disabled>2. Flash PandaCupboard</button>
+        <button type="button" id="btnFlash" disabled>2. Flash PandaFarm</button>
         <button type="button" class="secondary" id="btnDisconnect" disabled>Disconnect</button>
       </div>
 
@@ -164,7 +164,7 @@
         <li>Disconnect USB (or tap Reset if the screen stays blank).</li>
         <li>Tap the <strong>gear icon</strong> (top-right) → <strong>WiFi Setup</strong> and connect to your LAN.</li>
         <li><strong>Gear → Printers</strong> — add a printer (name, IP, LAN access code from the printer’s WLAN settings).</li>
-        <li>On the cupboard list, tap a printer for progress, pause, resume, stop, and reprint.</li>
+        <li>On the farm list, tap a printer for progress, pause, resume, stop, and reprint.</li>
         <li>The panel and printers must be on the same LAN. Local MQTT uses port <strong>8883</strong>, user <code>bblp</code>, password = access code.</li>
       </ol>
     </section>
@@ -173,7 +173,7 @@
       <p>
         Created by <a href="https://techjeeper.com/" target="_blank" rel="noopener">TechJeeper Designs</a>
         ·
-        <a href="https://github.com/TechJeeper/PandaCupboard" target="_blank" rel="noopener">PandaCupboard on GitHub</a>
+        <a href="https://github.com/TechJeeper/PandaFarm" target="_blank" rel="noopener">PandaFarm on GitHub</a>
         ·
         Uses <a href="https://github.com/espressif/esptool-js" target="_blank" rel="noopener">esptool-js</a>
         and the Web Serial API.
@@ -181,7 +181,7 @@
     </footer>
   </div>
 
-  <script type="module" src="app.js?v=2"></script>
+  <script type="module" src="app.js?v=3"></script>
   <noscript>
     <img src="https://pandacupboard.goatcounter.com/count?p=/flasher/" alt="">
   </noscript>

@@ -9,6 +9,7 @@ CupboardPreferences &CupboardPreferences::instance() {
 
 void CupboardPreferences::begin() {
     if (!loaded_) {
+        // Keep the original NVS namespace so upgrades do not wipe WiFi/printers.
         prefs_.begin("PandaCupboard", false);
         loaded_ = true;
     }

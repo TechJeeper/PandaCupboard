@@ -1,13 +1,13 @@
-# PandaCupboard Web Flasher
+# PandaFarm Web Flasher
 
 Browser-based firmware installer for **BTT K-Touch** and **PandaTouch**, powered by [esptool-js](https://github.com/espressif/esptool-js) and the [Web Serial API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API).
 
-Flashes **PandaCupboard** — Bambu Lab cupboard dashboard.
+Flashes **PandaFarm** — Bambu Lab farm dashboard.
 
 ## Live URL
 
 ```
-https://techjeeper.github.io/PandaCupboard/flasher/
+https://pandacupboard.techjeeper.com/flasher/
 ```
 
 ## GitHub Pages setup
@@ -29,10 +29,10 @@ Upload the files from `dist/firmware/` as assets on a GitHub Release tagged `v0.
 
 | Asset | Flash offset |
 |-------|----------------|
-| `pandacupboard-bootloader.bin` | `0x0` |
-| `pandacupboard-partitions.bin` | `0x8000` |
-| `pandacupboard-boot_app0.bin` | `0xE000` (optional but recommended) |
-| `pandacupboard-firmware.bin` | `0x10000` |
+| `pandafarm-bootloader.bin` | `0x0` |
+| `pandafarm-partitions.bin` | `0x8000` |
+| `pandafarm-boot_app0.bin` | `0xE000` (optional but recommended) |
+| `pandafarm-firmware.bin` | `0x10000` |
 
 The web flasher loads these from `docs/flasher/firmware/` on GitHub Pages.
 
@@ -47,7 +47,7 @@ The web flasher loads these from `docs/flasher/firmware/` on GitHub Pages.
 
 1. Power on the panel and open **gear → WiFi Setup**
 2. **Gear → Printers** — IP + LAN access code
-3. Tap a printer on the cupboard list for pause / resume / stop
+3. Tap a printer on the farm list for pause / resume / stop
 
 ## Browser support
 

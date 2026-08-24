@@ -41,6 +41,14 @@ bool wifiReady() {
     return WiFi.status() == WL_CONNECTED && WiFi.localIP()[0] != 0;
 }
 
+constexpr uint32_t kIdlePollMs = 25000;
+
+bool dueForPoll(const PrinterLive &live, uint32_t now) {
+    if (!live.lastSeenMs) return true;
+    if (bambuStateIsActive(live.state)) return true;
+    return (now - live.lastSeenMs) >= kIdlePollMs;
+}
+
 void clipLog(char *dst, size_t dstLen, const uint8_t *src, unsigned int len) {
     if (!dst || dstLen == 0) return;
     const size_t n = len < dstLen - 1 ? len : dstLen - 1;
@@ -91,6 +99,12 @@ void BambuFleet::forgetPrinter(int index) {
         live_[BAMBU_MAX_PRINTERS - 1] = PrinterLive{};
         if (pollIndex_ == index) forceDisconnect_ = true;
         else if (pollIndex_ > index) pollIndex_ -= 1;
+        for (int i = index; i < BAMBU_MAX_PRINTERS - 1; ++i) {
+            skipUntilMs_[i] = skipUntilMs_[i + 1];
+            failStreak_[i] = failStreak_[i + 1];
+        }
+        skipUntilMs_[BAMBU_MAX_PRINTERS - 1] = 0;
+        failStreak_[BAMBU_MAX_PRINTERS - 1] = 0;
         xSemaphoreGive(lock_);
     }
     reloadRequested_ = true;
@@ -198,14 +212,57 @@ bool BambuFleet::printerReady(int index) const {
     return cfg_->printers[index].ip[0] && cfg_->printers[index].accessCode[0];
 }
 
+bool BambuFleet::inBackoff(int index) const {
+    if (index < 0 || index >= BAMBU_MAX_PRINTERS) return false;
+    if (!skipUntilMs_[index]) return false;
+    return static_cast<int32_t>(millis() - skipUntilMs_[index]) < 0;
+}
+
+void BambuFleet::noteConnectResult(int index, bool ok) {
+    if (index < 0 || index >= BAMBU_MAX_PRINTERS) return;
+    if (ok) {
+        failStreak_[index] = 0;
+        skipUntilMs_[index] = 0;
+        return;
+    }
+    if (failStreak_[index] < 8) failStreak_[index] += 1;
+    uint32_t delayMs = 15000u << (failStreak_[index] > 3 ? 3 : failStreak_[index] - 1);
+    if (delayMs > 120000) delayMs = 120000;
+    skipUntilMs_[index] = millis() + delayMs;
+}
+
 int BambuFleet::nextConfigured(int from) const {
     const int n = count();
     if (n <= 0) return 0;
+    const uint32_t now = millis();
+    int bestDue = -1;
+    uint32_t bestDueAge = 0;
+    int bestAny = -1;
+    uint32_t bestAnyAge = 0;
+    int fallback = -1;
     for (int k = 1; k <= n; ++k) {
         const int i = (from + k) % n;
-        if (printerReady(i)) return i;
+        if (!printerReady(i)) continue;
+        if (inBackoff(i)) {
+            if (fallback < 0) fallback = i;
+            continue;
+        }
+        const uint32_t seen = live_[i].lastSeenMs;
+        const uint32_t age = seen ? now - seen : 0xFFFFFFFFu;
+        if (bestAny < 0 || age > bestAnyAge) {
+            bestAny = i;
+            bestAnyAge = age;
+        }
+        if (!dueForPoll(live_[i], now)) continue;
+        if (bestDue < 0 || age > bestDueAge) {
+            bestDue = i;
+            bestDueAge = age;
+        }
     }
-    return n ? (from + 1) % n : 0;
+    if (bestDue >= 0) return bestDue;
+    if (bestAny >= 0) return bestAny;
+    if (fallback >= 0) return fallback;
+    return (from + 1) % n;
 }
 
 void BambuFleet::nextPrinter() {
@@ -218,7 +275,7 @@ bool BambuFleet::connectMqtt(const char *ipStr, const char *accessCode, const ch
     if (!ip.fromString(ipStr)) return false;
     mqtt_->setServer(ip, BAMBU_MQTT_PORT);
     char clientId[40];
-    snprintf(clientId, sizeof(clientId), "PandaCupboard-%04X-%d", (unsigned)(ESP.getEfuseMac() & 0xFFFF), pollIndex_);
+    snprintf(clientId, sizeof(clientId), "PandaFarm-%04X-%d", (unsigned)(ESP.getEfuseMac() & 0xFFFF), pollIndex_);
     Serial.printf("[Bambu] MQTT %s @ %s sn=%s\n", name, ipStr,
                   cfg_->printers[pollIndex_].serial[0] ? cfg_->printers[pollIndex_].serial : "(none)");
     sessionOpen_ = true;
@@ -285,8 +342,11 @@ bool BambuFleet::connectCurrent() {
             strlcpy(live_[pollIndex_].lastError, mqttFailReason(lastRc), sizeof(live_[pollIndex_].lastError));
             xSemaphoreGive(lock_);
         }
+        noteConnectResult(pollIndex_, false);
         return false;
     }
+
+    noteConnectResult(pollIndex_, true);
 
     if (strcmp(p.ip, okHost) != 0) {
         Serial.printf("[Bambu] updating IP %s -> %s\n", p.ip, okHost);
@@ -538,15 +598,15 @@ void BambuFleet::loop() {
 void BambuFleet::taskLoop() {
     WiFiClientSecure tls;
     tls.setInsecure();
-    tls.setHandshakeTimeout(15);
-    tls.setTimeout(8000);
+    tls.setHandshakeTimeout(8);
+    tls.setTimeout(6000);
     PubSubClient mqtt(tls);
     mqtt.setCallback(mqttThunk);
     if (!mqtt.setBufferSize(BAMBU_MQTT_BUFFER)) {
         Serial.println("[Bambu] MQTT buffer alloc failed");
     }
-    mqtt.setKeepAlive(30);
-    mqtt.setSocketTimeout(8);
+    mqtt.setKeepAlive(20);
+    mqtt.setSocketTimeout(6);
     tls_ = &tls;
     mqtt_ = &mqtt;
 
@@ -580,10 +640,10 @@ void BambuFleet::taskLoop() {
             continue;
         }
 
-        if (!printerReady(pollIndex_)) {
+        if (!printerReady(pollIndex_) || (inBackoff(pollIndex_) && !mqtt.connected())) {
             if (sessionOpen_ || mqtt.connected()) disconnectMqtt();
             pollIndex_ = nextConfigured(pollIndex_);
-            vTaskDelay(pdMS_TO_TICKS(50));
+            vTaskDelay(pdMS_TO_TICKS(40));
             continue;
         }
 
@@ -591,7 +651,7 @@ void BambuFleet::taskLoop() {
             sessionOpen_ = false;
             if (!connectCurrent()) {
                 nextPrinter();
-                vTaskDelay(pdMS_TO_TICKS(800));
+                vTaskDelay(pdMS_TO_TICKS(40));
                 continue;
             }
         }
@@ -600,7 +660,7 @@ void BambuFleet::taskLoop() {
         if (!mqtt.connected()) {
             Serial.printf("[Bambu] dropped rc=%d\n", mqtt.state());
             sessionOpen_ = false;
-            vTaskDelay(pdMS_TO_TICKS(400));
+            vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
 
@@ -608,21 +668,17 @@ void BambuFleet::taskLoop() {
 
         const uint32_t now = millis();
         const bool focused = focusIndex_ >= 0;
-        if (cfg_->printers[pollIndex_].serial[0] && now - lastPushMs_ > (focused ? 10000 : 8000) &&
-            (focused || !gotStatus_)) {
+        const int n = count();
+        const bool stayOnPrinter = focused || n <= 1;
+        if (cfg_->printers[pollIndex_].serial[0] && now - lastPushMs_ > (stayOnPrinter ? 8000 : 2500) &&
+            (stayOnPrinter || !gotStatus_)) {
             requestPushAll(cfg_->printers[pollIndex_].serial);
         }
 
-        const int n = count();
-        uint32_t dwellMs = 12000;
-        if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(20)) == pdTRUE) {
-            if (bambuStateIsActive(live_[pollIndex_].state)) dwellMs = 28000;
-            xSemaphoreGive(lock_);
-        }
-        const bool timedOut = !gotStatus_ && now - connectStartMs_ > 15000;
-        const bool rotate = !focused && n > 1 && gotStatus_ && now - connectStartMs_ > dwellMs;
+        const bool timedOut = !gotStatus_ && now - connectStartMs_ > 8000;
+        const bool rotate = !stayOnPrinter && gotStatus_ && now - connectStartMs_ > 1100;
         if (timedOut) {
-            Serial.println("[Bambu] no gcode_state after 15s");
+            Serial.println("[Bambu] no gcode_state after 8s");
             if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
                 live_[pollIndex_].online = false;
                 if (!live_[pollIndex_].lastSeenMs) {

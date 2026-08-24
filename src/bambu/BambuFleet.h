@@ -48,6 +48,8 @@ private:
     bool connectMqtt(const char *ipStr, const char *accessCode, const char *name);
     int nextConfigured(int from) const;
     bool printerReady(int index) const;
+    bool inBackoff(int index) const;
+    void noteConnectResult(int index, bool ok);
 
     AppConfig *cfg_ = nullptr;
     BambuDiscovery *discovery_ = nullptr;
@@ -73,4 +75,6 @@ private:
     bool sessionOpen_ = false;
     volatile bool forceDisconnect_ = false;
     char sessionIp_[16] = {};
+    uint32_t skipUntilMs_[BAMBU_MAX_PRINTERS] = {};
+    uint8_t failStreak_[BAMBU_MAX_PRINTERS] = {};
 };

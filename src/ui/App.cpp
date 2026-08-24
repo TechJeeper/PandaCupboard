@@ -293,7 +293,7 @@ void CupboardApp::buildGearMenu() {
         lv_obj_center(lbl);
     };
 
-    addItem(LV_SYMBOL_HOME "  Cupboard", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_HOME "  Farm", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
         app->showFleet();
