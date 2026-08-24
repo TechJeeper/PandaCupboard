@@ -1,37 +1,47 @@
 # PandaCupboard
 
-Custom **PandaTouch / K-Touch** firmware that shows a Bambu Lab farm dashboard, styled like Bambu Studio’s device list.
+Custom firmware for **BIGTREETECH K-Touch** and **PandaTouch** that shows a Bambu Lab cupboard dashboard, styled like Bambu Studio’s device list.
 
-Built from the PaxxTouch board support (ESP32-S3, LVGL, GT911). The Snapmaker remote-mirror UI is replaced with LAN Bambu monitoring.
+Created by [TechJeeper Designs](https://techjeeper.com/).
+
+Built from the PaxxTouch board support (ESP32-S3, LVGL, GT911).
+
+## Flash firmware
+
+### Option A: Web flasher (recommended)
+
+1. Open **[PandaCupboard Web Flasher](https://techjeeper.github.io/PandaCupboard/flasher/)** in Chrome or Edge
+2. Connect USB, click **Connect USB**, then **Flash PandaCupboard**
+
+See [docs/flasher/README.md](docs/flasher/README.md) for self-hosting on GitHub Pages.
+
+### Option B: PlatformIO (developers)
+
+```bash
+pio run -e pandacupboard-arduino-3x -t upload --upload-port COM8
+```
+
+Package bins for a GitHub Release:
+
+```powershell
+.\scripts\package-firmware.ps1 -Version "0.1.0"
+```
 
 ## What you get
 
 - Compact table: **Device Name**, **Task Name**, **Device Status**
 - About **8 printer rows** on screen; scroll for more
 - Store up to 24 printers
-- Sort by **Device Status** (default) or Device Name
-- Active jobs with **higher completion** stay at the top
-- Setup with **IP address + LAN access code**
+- Pause / resume / stop / reprint from the printer detail screen
+- Setup with **IP address + LAN access code** (from the printer’s WLAN settings)
 - **SSDP discovery** for Bambu printers on the LAN
 - Status over **MQTT/TLS port 8883**, username `bblp`, password = access code
 
-## Printer requirements
+## First run
 
-On each Bambu:
+1. Flash PandaCupboard
+2. **Gear → WiFi Setup** — connect to your LAN
+3. **Gear → Printers** — add a printer (name, IP, access code)
+4. Tap a printer on the cupboard list for job details and controls
 
-1. Enable **LAN Mode**
-2. Note the **Access Code**
-3. Enable **Developer Mode** if you want control later (status reads work with LAN Mode)
-
-The panel and printers must be on the same LAN.
-
-## Flash
-
-```bash
-cd C:\Projects\PandaCupboard
-pio run -e pandacupboard-arduino-3x -t upload --upload-port COM5
-```
-
-First boot: **Gear → WiFi Setup**, then **Add Printer** (or Discover on LAN and enter the access code).
-
-This image replaces stock Panda Touch firmware. Keep a BTT `.bin` + `.img` if you want to restore official firmware.
+The panel and printers must be on the same LAN. This image replaces stock Panda Touch firmware — keep a BTT `.bin` / `.img` if you want to restore official firmware.

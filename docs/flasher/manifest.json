@@ -1,0 +1,47 @@
+{
+  "name": "PandaCupboard",
+  "version": "0.1.0",
+  "description": "Bambu Lab cupboard dashboard for BTT K-Touch / PandaTouch — Studio-style fleet list with pause, resume, stop, and LAN MQTT",
+  "chip": "ESP32-S3",
+  "hardware": "BTT K-Touch / PandaTouch (ESP32-S3, 8 MB PSRAM)",
+  "github": {
+    "owner": "TechJeeper",
+    "repo": "PandaCupboard"
+  },
+  "flash": {
+    "mode": "keep",
+    "freq": "keep",
+    "size": "keep",
+    "compress": false,
+    "eraseAll": true
+  },
+  "baudRate": 115200,
+  "firmwareLocal": {
+    "base": "./firmware/"
+  },
+  "firmwareCdn": {
+    "owner": "TechJeeper",
+    "repo": "PandaCupboard",
+    "ref": "main",
+    "path": "docs/flasher/firmware/"
+  },
+  "files": [
+    { "asset": "pandacupboard-bootloader.bin", "offset": 0 },
+    { "asset": "pandacupboard-partitions.bin", "offset": 32768 },
+    { "asset": "pandacupboard-boot_app0.bin", "offset": 57344, "optional": true },
+    { "asset": "pandacupboard-firmware.bin", "offset": 65536 }
+  ],
+  "localFallback": {
+    "bootloader.bin": 0,
+    "partitions.bin": 32768,
+    "boot_app0.bin": 57344,
+    "firmware.bin": 65536
+  },
+  "usbFilters": [
+    { "usbVendorId": 6790 },
+    { "usbVendorId": 12346 },
+    { "usbVendorId": 4292 },
+    { "usbVendorId": 1027 },
+    { "usbVendorId": 1659 }
+  ]
+}

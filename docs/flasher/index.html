@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PandaCupboard Web Flasher</title>
+  <meta name="description" content="Flash PandaCupboard v0.1.0 to BTT K-Touch or PandaTouch — Bambu Lab cupboard dashboard.">
+  <meta name="keywords" content="PandaCupboard, Bambu Lab, BTT K-Touch, PandaTouch, Web Flasher, Firmware, 3D Printer">
+  <meta name="author" content="TechJeeper Designs">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://techjeeper.github.io/PandaCupboard/flasher/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://techjeeper.github.io/PandaCupboard/flasher/">
+  <meta property="og:title" content="PandaCupboard Web Flasher">
+  <meta property="og:description" content="Flash PandaCupboard to BTT K-Touch or PandaTouch — Bambu Lab cupboard dashboard.">
+  <meta property="og:image" content="https://techjeeper.github.io/PandaCupboard/flasher/logo.jpg">
+
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://techjeeper.github.io/PandaCupboard/flasher/">
+  <meta property="twitter:title" content="PandaCupboard Web Flasher">
+  <meta property="twitter:description" content="Flash PandaCupboard to BTT K-Touch or PandaTouch — Bambu Lab cupboard dashboard.">
+  <meta property="twitter:image" content="https://techjeeper.github.io/PandaCupboard/flasher/logo.jpg">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>PandaCupboard Web Flasher</h1>
+      <p>Flash <strong>PandaCupboard</strong> to BTT K-Touch / PandaTouch<br>
+      Bambu Lab cupboard dashboard in a Studio-style list.</p>
+      <p><span class="badge" id="versionBadge">loading…</span></p>
+      <p class="header-links">
+        <a href="https://github.com/TechJeeper/PandaCupboard" target="_blank" rel="noopener">GitHub</a>
+        ·
+        <a href="https://github.com/TechJeeper/PandaCupboard/releases" target="_blank" rel="noopener">Releases</a>
+        ·
+        <a href="#features">Features</a>
+      </p>
+      <img src="logo.jpg" alt="PandaCupboard" class="header-logo" width="300" height="180">
+    </header>
+
+    <section class="card" id="features">
+      <h2>Features</h2>
+      <ul class="feature-grid">
+        <li><strong>Cupboard List</strong></li>
+        <li><strong>Pause / Resume / Stop</strong></li>
+        <li><strong>LAN MQTT</strong></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Requirements</h2>
+      <ol class="steps">
+        <li>Use <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> on desktop (Web Serial API).</li>
+        <li>This page must be served over <strong>HTTPS</strong> (GitHub Pages works).</li>
+        <li>Connect the K-Touch / PandaTouch with a <strong>USB-C data cable</strong> to your PC.</li>
+        <li>If the device is not detected, reboot it with the <strong>slider switch on the back</strong>, then connect again.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Firmware source</h2>
+      <div class="row">
+        <label><input type="radio" name="source" id="sourceRelease" checked> Bundled firmware (recommended)</label>
+        <label><input type="radio" name="source" id="sourceManual"> Manual files (.bin)</label>
+      </div>
+
+      <div id="panelRelease" style="margin-top:12px">
+        <p style="color:var(--muted);font-size:0.9rem;margin:0 0 8px">
+          Loads <code>pandacupboard-*.bin</code> from this page (with a jsDelivr CDN fallback).
+          Click <strong>Reload firmware</strong> after a new release is published.
+        </p>
+        <button type="button" class="secondary" id="btnFetchRelease">Reload firmware</button>
+      </div>
+
+      <div id="panelManual" class="hidden file-grid">
+        <p style="color:var(--muted);font-size:0.9rem;margin:0">
+          Use files from <code>pio run</code> build output (or a release zip):
+        </p>
+        <div class="file-row"><label>bootloader.bin @ 0x0</label><input type="file" id="fileBootloader" accept=".bin"></div>
+        <div class="file-row"><label>partitions.bin @ 0x8000</label><input type="file" id="filePartitions" accept=".bin"></div>
+        <div class="file-row"><label>boot_app0.bin @ 0xE000 (optional)</label><input type="file" id="fileBootApp0" accept=".bin"></div>
+        <div class="file-row"><label>firmware.bin @ 0x10000</label><input type="file" id="fileFirmware" accept=".bin"></div>
+        <p style="color:var(--muted);font-size:0.85rem;margin:8px 0 0">
+          Build with: <code>pio run -e pandacupboard-arduino-3x</code> — files in <code>.pio/build/pandacupboard-arduino-3x/</code>
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Flash</h2>
+      <div class="status" id="status">Initializing…</div>
+
+      <div class="progress-wrap" id="progressWrap">
+        <progress id="progress" max="100" value="0"></progress>
+        <div style="text-align:center;margin-top:4px;font-size:0.85rem;color:var(--muted)" id="progressLabel"></div>
+      </div>
+
+      <div class="row" style="margin-top:12px;flex-direction:column;align-items:flex-start;gap:8px">
+        <label><input type="checkbox" id="optEraseAll" checked> Erase entire flash before writing (recommended)</label>
+        <p style="color:var(--muted);font-size:0.85rem;margin:0">
+          Uses 115200 baud and uncompressed writes for CH340 USB bridges. Takes ~2-3 minutes — keep the cable still.
+        </p>
+      </div>
+
+      <p class="disclaimer">
+        <strong>Disclaimer:</strong> TechJeeper Designs is not responsible for damage to your device.
+        Flashing third-party firmware may void your manufacturer warranty. Proceed at your own risk.
+      </p>
+
+      <div class="row" style="margin-top:16px">
+        <button type="button" id="btnConnect">1. Connect USB</button>
+        <button type="button" id="btnFlash" disabled>2. Flash PandaCupboard</button>
+        <button type="button" class="secondary" id="btnDisconnect" disabled>Disconnect</button>
+      </div>
+
+      <div class="log" id="log" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <h2>After flashing</h2>
+      <ol class="steps">
+        <li>Disconnect USB (or tap Reset if the screen stays blank).</li>
+        <li>Tap the <strong>gear icon</strong> (top-right) → <strong>WiFi Setup</strong> and connect to your LAN.</li>
+        <li><strong>Gear → Printers</strong> — add a printer (name, IP, LAN access code from the printer’s WLAN settings).</li>
+        <li>On the cupboard list, tap a printer for progress, pause, resume, stop, and reprint.</li>
+        <li>The panel and printers must be on the same LAN. Local MQTT uses port <strong>8883</strong>, user <code>bblp</code>, password = access code.</li>
+      </ol>
+    </section>
+
+    <footer>
+      <p>
+        Created by <a href="https://techjeeper.com/" target="_blank" rel="noopener">TechJeeper Designs</a>
+        ·
+        <a href="https://github.com/TechJeeper/PandaCupboard" target="_blank" rel="noopener">PandaCupboard on GitHub</a>
+        ·
+        Uses <a href="https://github.com/espressif/esptool-js" target="_blank" rel="noopener">esptool-js</a>
+        and the Web Serial API.
+      </p>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js?v=1"></script>
+</body>
+</html>
