@@ -16,6 +16,7 @@ public:
     void begin(AppConfig *cfg, BambuDiscovery *discovery = nullptr);
     void loop();
     void reload();
+    void forgetPrinter(int index);
     void requestImmediate();
 
     int count() const;
@@ -45,8 +46,8 @@ private:
     void publishPrintCommand(const char *serial, const char *command, const char *param);
 
     bool connectMqtt(const char *ipStr, const char *accessCode, const char *name);
-    void collectMqttHosts(char hosts[][16], int *count, int maxHosts);
-    int scanLanMqtt(char hosts[][16], int maxHosts, int already);
+    int nextConfigured(int from) const;
+    bool printerReady(int index) const;
 
     AppConfig *cfg_ = nullptr;
     BambuDiscovery *discovery_ = nullptr;
@@ -61,7 +62,6 @@ private:
     uint32_t connectStartMs_ = 0;
     uint32_t lastStatusMs_ = 0;
     uint32_t wifiReadyMs_ = 0;
-    uint32_t lastLanScanMs_ = 0;
     uint32_t lastPushMs_ = 0;
     uint32_t seq_ = 1;
     volatile int focusIndex_ = -1;
@@ -71,4 +71,6 @@ private:
     bool gotStatus_ = false;
     bool started_ = false;
     bool sessionOpen_ = false;
+    volatile bool forceDisconnect_ = false;
+    char sessionIp_[16] = {};
 };

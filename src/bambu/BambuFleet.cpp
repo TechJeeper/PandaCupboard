@@ -9,14 +9,6 @@
 namespace {
 BambuFleet *gFleet = nullptr;
 
-void addHost(char hosts[][16], int *count, int maxHosts, const char *ip) {
-    if (!ip || !ip[0] || *count >= maxHosts) return;
-    for (int i = 0; i < *count; ++i) {
-        if (strcmp(hosts[i], ip) == 0) return;
-    }
-    strlcpy(hosts[(*count)++], ip, 16);
-}
-
 const char *mqttFailReason(int rc) {
     if (rc == 4 || rc == 5) return "Bad access code";
     if (rc == -4) return "MQTT timeout";
@@ -88,13 +80,17 @@ void BambuFleet::begin(AppConfig *cfg, BambuDiscovery *discovery) {
 }
 
 void BambuFleet::reload() {
+    if (pollIndex_ >= count()) forceDisconnect_ = true;
+    reloadRequested_ = true;
+}
+
+void BambuFleet::forgetPrinter(int index) {
+    if (index < 0 || index >= BAMBU_MAX_PRINTERS) return;
     if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(200)) == pdTRUE) {
-        for (int i = 0; i < BAMBU_MAX_PRINTERS; ++i) {
-            live_[i] = PrinterLive{};
-            live_[i].state = BambuGcodeState::Syncing;
-        }
-        pollIndex_ = 0;
-        gotStatus_ = false;
+        for (int i = index; i < BAMBU_MAX_PRINTERS - 1; ++i) live_[i] = live_[i + 1];
+        live_[BAMBU_MAX_PRINTERS - 1] = PrinterLive{};
+        if (pollIndex_ == index) forceDisconnect_ = true;
+        else if (pollIndex_ > index) pollIndex_ -= 1;
         xSemaphoreGive(lock_);
     }
     reloadRequested_ = true;
@@ -113,7 +109,7 @@ bool BambuFleet::getPrinter(int index, PrinterProfile *profile, PrinterLive *liv
     if (!lock_ || xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) != pdTRUE) return false;
     *profile = cfg_->printers[index];
     *live = live_[index];
-    if (!live->online && live->state != BambuGcodeState::Syncing) {
+    if (!live->online && live->lastSeenMs == 0 && live->state != BambuGcodeState::Syncing) {
         live->state = BambuGcodeState::Offline;
     }
     xSemaphoreGive(lock_);
@@ -131,7 +127,7 @@ void BambuFleet::snapshot(PrinterProfile *profiles, PrinterLive *live, int *coun
     for (int i = 0; i < n; ++i) {
         profiles[i] = cfg_->printers[i];
         live[i] = live_[i];
-        if (!live[i].online && live[i].state != BambuGcodeState::Syncing) {
+        if (!live[i].online && live[i].lastSeenMs == 0 && live[i].state != BambuGcodeState::Syncing) {
             live[i].state = BambuGcodeState::Offline;
         }
     }
@@ -183,6 +179,7 @@ void BambuFleet::sortedIndexes(int *outIdx, int *outCount, FleetSort sort) const
 }
 
 void BambuFleet::disconnectMqtt() {
+    sessionIp_[0] = '\0';
     if (!mqtt_ || !tls_) {
         sessionOpen_ = false;
         gotStatus_ = false;
@@ -196,14 +193,24 @@ void BambuFleet::disconnectMqtt() {
     gotStatus_ = false;
 }
 
+bool BambuFleet::printerReady(int index) const {
+    if (!cfg_ || index < 0 || index >= cfg_->printerCount) return false;
+    return cfg_->printers[index].ip[0] && cfg_->printers[index].accessCode[0];
+}
+
+int BambuFleet::nextConfigured(int from) const {
+    const int n = count();
+    if (n <= 0) return 0;
+    for (int k = 1; k <= n; ++k) {
+        const int i = (from + k) % n;
+        if (printerReady(i)) return i;
+    }
+    return n ? (from + 1) % n : 0;
+}
+
 void BambuFleet::nextPrinter() {
     disconnectMqtt();
-    const int n = count();
-    if (n <= 0) {
-        pollIndex_ = 0;
-        return;
-    }
-    pollIndex_ = (pollIndex_ + 1) % n;
+    pollIndex_ = nextConfigured(pollIndex_);
 }
 
 bool BambuFleet::connectMqtt(const char *ipStr, const char *accessCode, const char *name) {
@@ -215,40 +222,15 @@ bool BambuFleet::connectMqtt(const char *ipStr, const char *accessCode, const ch
     Serial.printf("[Bambu] MQTT %s @ %s sn=%s\n", name, ipStr,
                   cfg_->printers[pollIndex_].serial[0] ? cfg_->printers[pollIndex_].serial : "(none)");
     sessionOpen_ = true;
-    if (mqtt_->connect(clientId, "bblp", accessCode)) return true;
+    if (mqtt_->connect(clientId, "bblp", accessCode)) {
+        strlcpy(sessionIp_, ipStr, sizeof(sessionIp_));
+        return true;
+    }
     Serial.printf("[Bambu] connect failed rc=%d host=%s\n", mqtt_->state(), ipStr);
     tls_->stop();
     sessionOpen_ = false;
+    sessionIp_[0] = '\0';
     return false;
-}
-
-void BambuFleet::collectMqttHosts(char hosts[][16], int *count, int maxHosts) {
-    *count = 0;
-    addHost(hosts, count, maxHosts, cfg_->printers[pollIndex_].ip);
-    if (!discovery_) return;
-    for (const auto &d : discovery_->results()) addHost(hosts, count, maxHosts, d.ip);
-}
-
-int BambuFleet::scanLanMqtt(char hosts[][16], int maxHosts, int already) {
-    const IPAddress local = WiFi.localIP();
-    const IPAddress mask = WiFi.subnetMask();
-    if (mask[0] != 255 || mask[1] != 255 || mask[2] != 255) return already;
-    int n = already;
-    Serial.printf("[Bambu] scanning %u.%u.%u.x:8883\n", local[0], local[1], local[2]);
-    for (int i = 1; i < 255 && n < maxHosts; ++i) {
-        if (i == local[3]) continue;
-        IPAddress ip(local[0], local[1], local[2], i);
-        WiFiClient probe;
-        probe.setTimeout(40);
-        if (!probe.connect(ip, BAMBU_MQTT_PORT)) continue;
-        probe.stop();
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%u.%u.%u.%u", local[0], local[1], local[2], i);
-        addHost(hosts, &n, maxHosts, buf);
-        Serial.printf("[Bambu] MQTT open at %s\n", buf);
-    }
-    lastLanScanMs_ = millis();
-    return n;
 }
 
 bool BambuFleet::connectCurrent() {
@@ -257,11 +239,15 @@ bool BambuFleet::connectCurrent() {
     if (n <= 0) return false;
     if (pollIndex_ < 0 || pollIndex_ >= n) pollIndex_ = 0;
     PrinterProfile &p = cfg_->printers[pollIndex_];
-    if (!p.accessCode[0]) {
+    if (!p.ip[0] || !p.accessCode[0]) {
         if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
-            live_[pollIndex_].state = BambuGcodeState::Offline;
             live_[pollIndex_].online = false;
-            strlcpy(live_[pollIndex_].lastError, "Missing access code", sizeof(live_[pollIndex_].lastError));
+            if (!live_[pollIndex_].lastSeenMs) {
+                live_[pollIndex_].state = BambuGcodeState::Offline;
+                strlcpy(live_[pollIndex_].lastError,
+                        p.accessCode[0] ? "Missing IP" : "Missing access code",
+                        sizeof(live_[pollIndex_].lastError));
+            }
             xSemaphoreGive(lock_);
         }
         return false;
@@ -272,32 +258,30 @@ bool BambuFleet::connectCurrent() {
         xSemaphoreGive(lock_);
     }
 
-    char hosts[12][16] = {};
-    int hostCount = 0;
-    collectMqttHosts(hosts, &hostCount, 12);
-
-    int lastRc = -2;
     const char *okHost = nullptr;
-    auto tryRange = [&](int from, int to) {
-        for (int i = from; i < to && !okHost; ++i) {
-            if (connectMqtt(hosts[i], p.accessCode, p.name)) {
-                okHost = hosts[i];
-                return;
+    int lastRc = -2;
+    if (connectMqtt(p.ip, p.accessCode, p.name)) {
+        okHost = p.ip;
+    } else {
+        lastRc = mqtt_->state();
+        if (p.serial[0] && discovery_) {
+            for (const auto &d : discovery_->results()) {
+                if (!d.ip[0] || strcmp(d.serial, p.serial) != 0 || strcmp(d.ip, p.ip) == 0) continue;
+                if (connectMqtt(d.ip, p.accessCode, p.name)) {
+                    okHost = d.ip;
+                    break;
+                }
+                lastRc = mqtt_->state();
             }
-            lastRc = mqtt_->state();
         }
-    };
-    tryRange(0, hostCount);
-    if (!okHost && (lastLanScanMs_ == 0 || millis() - lastLanScanMs_ > 60000)) {
-        const int before = hostCount;
-        hostCount = scanLanMqtt(hosts, 12, hostCount);
-        tryRange(before, hostCount);
     }
 
     if (!okHost) {
         if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
             live_[pollIndex_].online = false;
-            live_[pollIndex_].state = BambuGcodeState::Offline;
+            if (!live_[pollIndex_].lastSeenMs) {
+                live_[pollIndex_].state = BambuGcodeState::Offline;
+            }
             strlcpy(live_[pollIndex_].lastError, mqttFailReason(lastRc), sizeof(live_[pollIndex_].lastError));
             xSemaphoreGive(lock_);
         }
@@ -576,7 +560,11 @@ void BambuFleet::taskLoop() {
 
         if (reloadRequested_) {
             reloadRequested_ = false;
-            disconnectMqtt();
+            const bool keepSession = mqtt.connected() && !forceDisconnect_ && pollIndex_ >= 0 &&
+                                     pollIndex_ < count() && printerReady(pollIndex_) && sessionIp_[0] &&
+                                     strcmp(cfg_->printers[pollIndex_].ip, sessionIp_) == 0;
+            forceDisconnect_ = false;
+            if (!keepSession) disconnectMqtt();
         }
 
         if (!cfg_ || count() <= 0 || !wifiReady()) {
@@ -592,11 +580,18 @@ void BambuFleet::taskLoop() {
             continue;
         }
 
+        if (!printerReady(pollIndex_)) {
+            if (sessionOpen_ || mqtt.connected()) disconnectMqtt();
+            pollIndex_ = nextConfigured(pollIndex_);
+            vTaskDelay(pdMS_TO_TICKS(50));
+            continue;
+        }
+
         if (!mqtt.connected()) {
             sessionOpen_ = false;
             if (!connectCurrent()) {
                 nextPrinter();
-                vTaskDelay(pdMS_TO_TICKS(3000));
+                vTaskDelay(pdMS_TO_TICKS(800));
                 continue;
             }
         }
@@ -619,13 +614,20 @@ void BambuFleet::taskLoop() {
         }
 
         const int n = count();
+        uint32_t dwellMs = 12000;
+        if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(20)) == pdTRUE) {
+            if (bambuStateIsActive(live_[pollIndex_].state)) dwellMs = 28000;
+            xSemaphoreGive(lock_);
+        }
         const bool timedOut = !gotStatus_ && now - connectStartMs_ > 15000;
-        const bool rotate = !focused && n > 1 && gotStatus_ && now - connectStartMs_ > 12000;
+        const bool rotate = !focused && n > 1 && gotStatus_ && now - connectStartMs_ > dwellMs;
         if (timedOut) {
             Serial.println("[Bambu] no gcode_state after 15s");
             if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
                 live_[pollIndex_].online = false;
-                live_[pollIndex_].state = BambuGcodeState::Offline;
+                if (!live_[pollIndex_].lastSeenMs) {
+                    live_[pollIndex_].state = BambuGcodeState::Offline;
+                }
                 strlcpy(live_[pollIndex_].lastError, "Connected, no status yet", sizeof(live_[pollIndex_].lastError));
                 xSemaphoreGive(lock_);
             }

@@ -24,7 +24,7 @@ pio run -e pandacupboard-arduino-3x -t upload --upload-port COM8
 Package bins for a GitHub Release:
 
 ```powershell
-.\scripts\package-firmware.ps1 -Version "0.1.0"
+.\scripts\package-firmware.ps1 -Version "0.2.0"
 ```
 
 ## What you get

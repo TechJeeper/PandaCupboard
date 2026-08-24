@@ -25,6 +25,9 @@ private:
     CupboardApp *app_ = nullptr;
     lv_obj_t *screen_ = nullptr;
     lv_obj_t *list_ = nullptr;
+    lv_obj_t *titleBar_ = nullptr;
+    lv_obj_t *titleLbl_ = nullptr;
+    lv_obj_t *header_ = nullptr;
     lv_obj_t *nameHdr_ = nullptr;
     lv_obj_t *statusHdr_ = nullptr;
     uint32_t lastUiMs_ = 0;
@@ -139,6 +142,47 @@ private:
     bool scanning_ = false;
 };
 
+class ThemeScreen {
+public:
+    void create(CupboardApp *app, lv_obj_t *parent);
+    void onEnter();
+    void refresh();
+    lv_obj_t *root() const { return screen_; }
+
+private:
+    static void onSize(lv_event_t *e);
+    static void onTheme(lv_event_t *e);
+
+    CupboardApp *app_ = nullptr;
+    lv_obj_t *screen_ = nullptr;
+    lv_obj_t *sizeBtns_[3] = {};
+    lv_obj_t *themeBtns_[static_cast<int>(UiTheme::Count)] = {};
+};
+
+class DisplayScreen {
+public:
+    void create(CupboardApp *app, lv_obj_t *parent);
+    void onEnter();
+    void refresh();
+    void commit();
+    lv_obj_t *root() const { return screen_; }
+
+private:
+    void updateLabels();
+    void applyFromSliders(bool save);
+    static void onSlider(lv_event_t *e);
+
+    CupboardApp *app_ = nullptr;
+    lv_obj_t *screen_ = nullptr;
+    lv_obj_t *brightSlider_ = nullptr;
+    lv_obj_t *brightVal_ = nullptr;
+    lv_obj_t *dimSlider_ = nullptr;
+    lv_obj_t *dimVal_ = nullptr;
+    lv_obj_t *sleepSlider_ = nullptr;
+    lv_obj_t *sleepVal_ = nullptr;
+    bool loading_ = false;
+};
+
 class SettingsScreen {
 public:
     void create(CupboardApp *app, lv_obj_t *parent);
@@ -159,9 +203,12 @@ public:
     WifiService &wifi() { return wifi_; }
     BambuDiscovery &discovery() { return discovery_; }
     AppConfig &config() { return config_; }
-    bool isDark() const { return config_.darkTheme; }
+    bool isDark() const { return PaxxTheme::isDark(); }
 
     void saveConfig();
+    void applyAppearance();
+    void setAppearance(UiTheme theme, UiTextSize textSize);
+    void applyDisplaySettings(uint8_t brightness, uint16_t dimSec, uint16_t sleepSec, bool save);
     bool addPrinter();
     bool removePrinter(int index);
     void editPrinter(int index);
@@ -174,6 +221,8 @@ public:
     void showSetup();
     void showPrinterManager();
     void showWifi();
+    void showTheme();
+    void showDisplay();
     void showSettings();
     void showGlobalLoading(bool visible, const char *text = nullptr);
     void refreshDisplay();
@@ -181,6 +230,8 @@ public:
     SetupScreen &setup() { return setup_; }
     PrinterManagerScreen &printerManager() { return printerManager_; }
     WifiScreen &wifiScreen() { return wifiScreen_; }
+    ThemeScreen &themeScreen() { return themeScreen_; }
+    DisplayScreen &displayScreen() { return displayScreen_; }
     SettingsScreen &settings() { return settings_; }
     FleetScreen &fleet() { return fleet_; }
     DetailScreen &detail() { return detail_; }
@@ -217,6 +268,8 @@ private:
     SetupScreen setup_;
     PrinterManagerScreen printerManager_;
     WifiScreen wifiScreen_;
+    ThemeScreen themeScreen_;
+    DisplayScreen displayScreen_;
     SettingsScreen settings_;
 };
 

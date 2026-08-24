@@ -22,6 +22,20 @@ void CupboardPreferences::load(AppConfig &out) {
     out.printerCount = prefs_.getInt("p_count", 0);
     out.editIndex = prefs_.getInt("p_edit", 0);
     out.darkTheme = prefs_.getBool("dark", true);
+    out.uiTheme = static_cast<UiTheme>(prefs_.getUChar(
+        "theme", static_cast<uint8_t>(out.darkTheme ? UiTheme::Night : UiTheme::Light)));
+    if (static_cast<uint8_t>(out.uiTheme) >= static_cast<uint8_t>(UiTheme::Count)) out.uiTheme = UiTheme::Night;
+    out.textSize = static_cast<UiTextSize>(prefs_.getUChar("text", static_cast<uint8_t>(UiTextSize::Medium)));
+    if (static_cast<uint8_t>(out.textSize) > static_cast<uint8_t>(UiTextSize::Large)) {
+        out.textSize = UiTextSize::Medium;
+    }
+    out.brightness = prefs_.getUChar("bright", 100);
+    if (out.brightness < 1) out.brightness = 1;
+    if (out.brightness > 100) out.brightness = 100;
+    out.dimSec = prefs_.getUShort("dim", 0);
+    if (out.dimSec > 600) out.dimSec = 600;
+    out.sleepSec = prefs_.getUShort("sleep", 0);
+    if (out.sleepSec > 1800) out.sleepSec = 1800;
     out.fleetSort = static_cast<FleetSort>(prefs_.getUChar("sort", static_cast<uint8_t>(FleetSort::DeviceStatus)));
 
     if (out.printerCount < 0) out.printerCount = 0;
@@ -51,6 +65,11 @@ void CupboardPreferences::save(const AppConfig &cfg) {
     prefs_.putInt("p_count", cfg.printerCount);
     prefs_.putInt("p_edit", cfg.editIndex);
     prefs_.putBool("dark", cfg.darkTheme);
+    prefs_.putUChar("theme", static_cast<uint8_t>(cfg.uiTheme));
+    prefs_.putUChar("text", static_cast<uint8_t>(cfg.textSize));
+    prefs_.putUChar("bright", cfg.brightness);
+    prefs_.putUShort("dim", cfg.dimSec);
+    prefs_.putUShort("sleep", cfg.sleepSec);
     prefs_.putUChar("sort", static_cast<uint8_t>(cfg.fleetSort));
 
     const int count = cfg.printerCount < BAMBU_MAX_PRINTERS ? cfg.printerCount : BAMBU_MAX_PRINTERS;

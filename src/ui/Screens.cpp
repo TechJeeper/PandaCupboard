@@ -10,13 +10,8 @@
 #include <vector>
 
 namespace {
-constexpr int kRowH = 48;
 constexpr int kColName = 250;
 constexpr int kColTask = 270;
-const lv_color_t kBarGreen = lv_color_hex(0x22C55E);
-const lv_color_t kHeaderBg = lv_color_hex(0x1F2937);
-const lv_color_t kRowBg = lv_color_hex(0x111827);
-const lv_color_t kRowAlt = lv_color_hex(0x0B1220);
 
 void styleTa(lv_obj_t *ta) {
     paxx_set_form_width(ta);
@@ -34,11 +29,12 @@ void fillStatus(const PrinterLive &live, const PrinterProfile &profile, char *ou
         snprintf(out, outLen, "Not configured");
         return;
     }
-    if (live.state == BambuGcodeState::Syncing && !live.online) {
-        snprintf(out, outLen, "syncing");
+    if (!live.online && live.lastSeenMs == 0) {
+        if (live.state == BambuGcodeState::Syncing) snprintf(out, outLen, "syncing");
+        else snprintf(out, outLen, "%s", live.lastError[0] ? live.lastError : "Offline");
         return;
     }
-    if (!live.online || live.state == BambuGcodeState::Offline) {
+    if (!live.online && live.state == BambuGcodeState::Offline) {
         snprintf(out, outLen, "%s", live.lastError[0] ? live.lastError : "Offline");
         return;
     }
@@ -76,8 +72,23 @@ lv_color_t statusToneColor(StatusTone tone) {
         case StatusTone::Pause:
         case StatusTone::Stop: return PaxxTheme::warn();
         case StatusTone::Error: return PaxxTheme::danger();
-        default: return PaxxTheme::text(true);
+        default: return PaxxTheme::text();
     }
+}
+
+void formatTimeout(uint16_t sec, char *buf, size_t n) {
+    if (sec == 0) {
+        snprintf(buf, n, "Never");
+        return;
+    }
+    if (sec < 60) {
+        snprintf(buf, n, "%u sec", static_cast<unsigned>(sec));
+        return;
+    }
+    const unsigned m = sec / 60;
+    const unsigned s = sec % 60;
+    if (s == 0) snprintf(buf, n, "%u min", m);
+    else snprintf(buf, n, "%u min %u sec", m, s);
 }
 }  // namespace
 
@@ -85,29 +96,29 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     app_ = app;
     screen_ = lv_obj_create(parent);
     lv_obj_set_size(screen_, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(true), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
     lv_obj_set_style_border_width(screen_, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(screen_, 0, LV_PART_MAIN);
     paxx_disable_input(screen_);
 
-    lv_obj_t *titleBar = lv_obj_create(screen_);
-    lv_obj_set_size(titleBar, LV_PCT(100), 48);
-    lv_obj_align(titleBar, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_bg_color(titleBar, PaxxTheme::bg(true), LV_PART_MAIN);
-    lv_obj_set_style_border_width(titleBar, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(titleBar, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(titleBar, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_hor(titleBar, 16, LV_PART_MAIN);
-    paxx_disable_input(titleBar);
+    titleBar_ = lv_obj_create(screen_);
+    lv_obj_set_size(titleBar_, LV_PCT(100), 48);
+    lv_obj_align(titleBar_, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_bg_color(titleBar_, PaxxTheme::bg(), LV_PART_MAIN);
+    lv_obj_set_style_border_width(titleBar_, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(titleBar_, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(titleBar_, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_hor(titleBar_, 16, LV_PART_MAIN);
+    paxx_disable_input(titleBar_);
 
-    lv_obj_t *title = lv_label_create(titleBar);
-    lv_label_set_text(title, "PandaCupboard");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_18, LV_PART_MAIN);
-    lv_obj_set_width(title, 420);
-    lv_label_set_long_mode(title, LV_LABEL_LONG_CLIP);
-    lv_obj_align(title, LV_ALIGN_LEFT_MID, 0, 0);
+    titleLbl_ = lv_label_create(titleBar_);
+    lv_label_set_text(titleLbl_, "PandaCupboard");
+    lv_obj_set_style_text_font(titleLbl_, PaxxTheme::fontTitle(), LV_PART_MAIN);
+    lv_obj_set_width(titleLbl_, 420);
+    lv_label_set_long_mode(titleLbl_, LV_LABEL_LONG_CLIP);
+    lv_obj_align(titleLbl_, LV_ALIGN_LEFT_MID, 0, 0);
 
-    lv_obj_t *addBtn = lv_button_create(titleBar);
+    lv_obj_t *addBtn = lv_button_create(titleBar_);
     lv_obj_set_size(addBtn, 48, 36);
     lv_obj_align(addBtn, LV_ALIGN_RIGHT_MID, -48, 0);
     lv_obj_add_event_cb(addBtn, [](lv_event_t *e) {
@@ -115,27 +126,27 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     }, LV_EVENT_CLICKED, app);
     lv_label_set_text(lv_label_create(addBtn), LV_SYMBOL_PLUS);
 
-    lv_obj_t *header = lv_obj_create(screen_);
-    lv_obj_set_size(header, LV_PCT(100), 36);
-    lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 48);
-    lv_obj_set_style_bg_color(header, kHeaderBg, LV_PART_MAIN);
-    lv_obj_set_style_border_width(header, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(header, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(header, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_hor(header, 12, LV_PART_MAIN);
-    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(header, 8, LV_PART_MAIN);
+    header_ = lv_obj_create(screen_);
+    lv_obj_set_size(header_, LV_PCT(100), 36);
+    lv_obj_align(header_, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_set_style_bg_color(header_, PaxxTheme::header(), LV_PART_MAIN);
+    lv_obj_set_style_border_width(header_, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(header_, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(header_, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_hor(header_, 12, LV_PART_MAIN);
+    lv_obj_set_flex_flow(header_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(header_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(header_, 8, LV_PART_MAIN);
 
     auto makeHdr = [&](const char *text, int w, lv_event_cb_t cb, lv_obj_t **store) {
-        lv_obj_t *btn = lv_button_create(header);
+        lv_obj_t *btn = lv_button_create(header_);
         lv_obj_set_size(btn, w, 28);
         lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
         lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
         lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, this);
         lv_obj_t *lbl = lv_label_create(btn);
         lv_label_set_text(lbl, text);
-        lv_obj_set_style_text_color(lbl, PaxxTheme::muted(true), LV_PART_MAIN);
+        lv_obj_set_style_text_color(lbl, PaxxTheme::muted(), LV_PART_MAIN);
         lv_obj_align(lbl, LV_ALIGN_LEFT_MID, 0, 0);
         if (store) *store = lbl;
         return btn;
@@ -147,7 +158,7 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     list_ = lv_obj_create(screen_);
     lv_obj_set_size(list_, LV_PCT(100), 396);
     lv_obj_align(list_, LV_ALIGN_TOP_MID, 0, 84);
-    lv_obj_set_style_bg_color(list_, kRowBg, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(list_, PaxxTheme::row(), LV_PART_MAIN);
     lv_obj_set_style_border_width(list_, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(list_, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(list_, 0, LV_PART_MAIN);
@@ -170,7 +181,29 @@ void FleetScreen::onSortStatus(lv_event_t *e) {
     self->rebuild();
 }
 
-void FleetScreen::onEnter() { rebuild(); }
+void FleetScreen::onEnter() {
+    if (screen_) lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
+    if (titleBar_) lv_obj_set_style_bg_color(titleBar_, PaxxTheme::bg(), LV_PART_MAIN);
+    if (titleLbl_) {
+        lv_obj_set_style_text_font(titleLbl_, PaxxTheme::fontTitle(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(titleLbl_, PaxxTheme::text(), LV_PART_MAIN);
+    }
+    if (header_) {
+        lv_obj_set_style_bg_color(header_, PaxxTheme::header(), LV_PART_MAIN);
+        const uint32_t n = lv_obj_get_child_count(header_);
+        for (uint32_t i = 0; i < n; ++i) {
+            lv_obj_t *btn = lv_obj_get_child(header_, i);
+            const uint32_t m = lv_obj_get_child_count(btn);
+            for (uint32_t j = 0; j < m; ++j) {
+                lv_obj_t *lbl = lv_obj_get_child(btn, j);
+                lv_obj_set_style_text_color(lbl, PaxxTheme::muted(), LV_PART_MAIN);
+                lv_obj_set_style_text_font(lbl, PaxxTheme::fontBody(), LV_PART_MAIN);
+            }
+        }
+    }
+    if (list_) lv_obj_set_style_bg_color(list_, PaxxTheme::row(), LV_PART_MAIN);
+    rebuild();
+}
 
 void FleetScreen::onTick() {
     if (millis() - lastUiMs_ < 800) return;
@@ -191,7 +224,7 @@ void FleetScreen::rebuild() {
     if (n == 0) {
         lv_obj_t *empty = lv_label_create(list_);
         lv_label_set_text(empty, "No printers yet. Tap + or Gear -> Printers.\nDiscover on the LAN from printer setup.");
-        lv_obj_set_style_text_color(empty, PaxxTheme::muted(true), LV_PART_MAIN);
+        lv_obj_set_style_text_color(empty, PaxxTheme::muted(), LV_PART_MAIN);
         lv_obj_set_style_pad_all(empty, 24, LV_PART_MAIN);
         return;
     }
@@ -202,8 +235,8 @@ void FleetScreen::rebuild() {
         const PrinterLive &st = live_[i];
 
         lv_obj_t *row = lv_button_create(list_);
-        lv_obj_set_size(row, LV_PCT(100), kRowH);
-        lv_obj_set_style_bg_color(row, (r % 2) ? kRowAlt : kRowBg, LV_PART_MAIN);
+        lv_obj_set_size(row, LV_PCT(100), PaxxTheme::rowHeight());
+        lv_obj_set_style_bg_color(row, (r % 2) ? PaxxTheme::rowAlt() : PaxxTheme::row(), LV_PART_MAIN);
         lv_obj_set_style_radius(row, 0, LV_PART_MAIN);
         lv_obj_set_style_shadow_width(row, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
@@ -222,6 +255,8 @@ void FleetScreen::rebuild() {
         else snprintf(nameBuf, sizeof(nameBuf), "%s", p.name[0] ? p.name : "Printer");
         lv_label_set_text(name, nameBuf);
         lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_font(name, PaxxTheme::fontBody(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(name, PaxxTheme::text(), LV_PART_MAIN);
         lv_obj_set_width(name, kColName - 8);
         lv_obj_align(name, LV_ALIGN_LEFT_MID, 0, 0);
 
@@ -233,7 +268,8 @@ void FleetScreen::rebuild() {
         lv_label_set_long_mode(task, LV_LABEL_LONG_DOT);
         lv_obj_set_width(task, kColTask - 8);
         lv_obj_align(task, LV_ALIGN_LEFT_MID, kColName, 0);
-        lv_obj_set_style_text_color(task, PaxxTheme::muted(true), LV_PART_MAIN);
+        lv_obj_set_style_text_font(task, PaxxTheme::fontBody(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(task, PaxxTheme::muted(), LV_PART_MAIN);
 
         char status[48];
         int pct = -1;
@@ -241,7 +277,7 @@ void FleetScreen::rebuild() {
         fillStatus(st, p, status, sizeof(status), &pct, &tone);
 
         lv_obj_t *statusBox = lv_obj_create(row);
-        lv_obj_set_size(statusBox, 240, 40);
+        lv_obj_set_size(statusBox, 240, PaxxTheme::rowHeight() - 8);
         lv_obj_align(statusBox, LV_ALIGN_LEFT_MID, kColName + kColTask, 0);
         lv_obj_set_style_bg_opa(statusBox, LV_OPA_TRANSP, LV_PART_MAIN);
         lv_obj_set_style_border_width(statusBox, 0, LV_PART_MAIN);
@@ -250,6 +286,7 @@ void FleetScreen::rebuild() {
 
         lv_obj_t *stLbl = lv_label_create(statusBox);
         lv_label_set_text(stLbl, status);
+        lv_obj_set_style_text_font(stLbl, PaxxTheme::fontBody(), LV_PART_MAIN);
         lv_obj_set_style_text_color(stLbl, statusToneColor(tone), LV_PART_MAIN);
         lv_obj_align(stLbl, LV_ALIGN_TOP_LEFT, 0, 0);
 
@@ -258,7 +295,7 @@ void FleetScreen::rebuild() {
             lv_obj_set_size(bar, 220, 10);
             lv_obj_align(bar, LV_ALIGN_BOTTOM_LEFT, 0, 0);
             lv_obj_set_style_bg_color(bar, lv_color_hex(0x374151), LV_PART_MAIN);
-            lv_obj_set_style_bg_color(bar, kBarGreen, LV_PART_INDICATOR);
+            lv_obj_set_style_bg_color(bar, PaxxTheme::accent(), LV_PART_INDICATOR);
             lv_bar_set_range(bar, 0, 100);
             lv_bar_set_value(bar, pct, LV_ANIM_OFF);
         }
@@ -293,14 +330,14 @@ void DetailScreen::create(CupboardApp *app, lv_obj_t *parent) {
     app_ = app;
     screen_ = lv_obj_create(parent);
     lv_obj_set_size(screen_, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(true), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
     lv_obj_set_style_border_width(screen_, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(screen_, 0, LV_PART_MAIN);
     paxx_style_form_screen(screen_);
     paxx_create_nav_bar(screen_, "Printer", farm_back_fleet_cb, app, true);
 
     nameLbl_ = lv_label_create(screen_);
-    lv_obj_set_style_text_font(nameLbl_, &lv_font_montserrat_18, LV_PART_MAIN);
+    lv_obj_set_style_text_font(nameLbl_, PaxxTheme::fontTitle(), LV_PART_MAIN);
     lv_obj_align(nameLbl_, LV_ALIGN_TOP_LEFT, 24, 64);
     lv_label_set_text(nameLbl_, "Printer");
 
@@ -312,12 +349,12 @@ void DetailScreen::create(CupboardApp *app, lv_obj_t *parent) {
     taskLbl_ = lv_label_create(screen_);
     lv_obj_set_width(taskLbl_, 752);
     lv_label_set_long_mode(taskLbl_, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_color(taskLbl_, PaxxTheme::muted(true), LV_PART_MAIN);
+    lv_obj_set_style_text_color(taskLbl_, PaxxTheme::muted(), LV_PART_MAIN);
     lv_obj_align(taskLbl_, LV_ALIGN_TOP_LEFT, 24, 96);
     lv_label_set_text(taskLbl_, "No task");
 
     percentLbl_ = lv_label_create(screen_);
-    lv_obj_set_style_text_font(percentLbl_, &lv_font_montserrat_18, LV_PART_MAIN);
+    lv_obj_set_style_text_font(percentLbl_, PaxxTheme::fontLarge(), LV_PART_MAIN);
     lv_obj_align(percentLbl_, LV_ALIGN_TOP_LEFT, 24, 140);
     lv_label_set_text(percentLbl_, "--%");
 
@@ -332,8 +369,8 @@ void DetailScreen::create(CupboardApp *app, lv_obj_t *parent) {
     bar_ = lv_bar_create(screen_);
     lv_obj_set_size(bar_, 752, 18);
     lv_obj_align(bar_, LV_ALIGN_TOP_MID, 0, 178);
-    lv_obj_set_style_bg_color(bar_, lv_color_hex(0x374151), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(bar_, kBarGreen, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(bar_, PaxxTheme::header(), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar_, PaxxTheme::accent(), LV_PART_INDICATOR);
     lv_bar_set_range(bar_, 0, 100);
     lv_bar_set_value(bar_, 0, LV_ANIM_OFF);
 
@@ -342,7 +379,7 @@ void DetailScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_label_set_text(tempLbl_, "Nozzle -- C    Bed -- C");
 
     metaLbl_ = lv_label_create(screen_);
-    lv_obj_set_style_text_color(metaLbl_, PaxxTheme::muted(true), LV_PART_MAIN);
+    lv_obj_set_style_text_color(metaLbl_, PaxxTheme::muted(), LV_PART_MAIN);
     lv_obj_align(metaLbl_, LV_ALIGN_TOP_LEFT, 24, 246);
     lv_label_set_text(metaLbl_, "");
 
@@ -365,7 +402,7 @@ void DetailScreen::create(CupboardApp *app, lv_obj_t *parent) {
     centeredLabel(reprintBtn_, "Reprint");
 
     lv_obj_t *edit = lv_button_create(screen_);
-    styleActionBtn(edit, PaxxTheme::surface(true), 230);
+    styleActionBtn(edit, PaxxTheme::surface(), 230);
     lv_obj_align(edit, LV_ALIGN_TOP_LEFT, 24, 368);
     lv_obj_add_event_cb(edit, onEdit, LV_EVENT_CLICKED, this);
     centeredLabel(edit, "Connection");
@@ -373,7 +410,7 @@ void DetailScreen::create(CupboardApp *app, lv_obj_t *parent) {
     confirm_ = lv_obj_create(screen_);
     lv_obj_set_size(confirm_, 420, 180);
     lv_obj_center(confirm_);
-    lv_obj_set_style_bg_color(confirm_, PaxxTheme::surface(true), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(confirm_, PaxxTheme::surface(), LV_PART_MAIN);
     lv_obj_set_style_radius(confirm_, 12, LV_PART_MAIN);
     lv_obj_add_flag(confirm_, LV_OBJ_FLAG_HIDDEN);
 
@@ -409,6 +446,22 @@ void DetailScreen::create(CupboardApp *app, lv_obj_t *parent) {
 }
 
 void DetailScreen::onEnter() {
+    if (screen_) lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
+    if (nameLbl_) {
+        lv_obj_set_style_text_font(nameLbl_, PaxxTheme::fontTitle(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(nameLbl_, PaxxTheme::text(), LV_PART_MAIN);
+    }
+    if (percentLbl_) lv_obj_set_style_text_font(percentLbl_, PaxxTheme::fontLarge(), LV_PART_MAIN);
+    if (taskLbl_) lv_obj_set_style_text_color(taskLbl_, PaxxTheme::muted(), LV_PART_MAIN);
+    if (metaLbl_) lv_obj_set_style_text_color(metaLbl_, PaxxTheme::muted(), LV_PART_MAIN);
+    if (bar_) {
+        lv_obj_set_style_bg_color(bar_, PaxxTheme::header(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(bar_, PaxxTheme::accent(), LV_PART_INDICATOR);
+    }
+    if (pauseBtn_) styleActionBtn(pauseBtn_, PaxxTheme::primary(), 230);
+    if (stopBtn_) styleActionBtn(stopBtn_, PaxxTheme::danger(), 230);
+    if (reprintBtn_) styleActionBtn(reprintBtn_, PaxxTheme::accent(), 230);
+    if (confirm_) lv_obj_set_style_bg_color(confirm_, PaxxTheme::surface(), LV_PART_MAIN);
     setStopConfirm(false);
     lastUiMs_ = 0;
     refresh();
@@ -561,7 +614,7 @@ void SetupScreen::create(CupboardApp *app, lv_obj_t *parent) {
     paxx_set_form_width(hintLbl_);
     lv_obj_align(hintLbl_, LV_ALIGN_TOP_MID, 0, y);
     y += 28;
-    lv_obj_set_style_text_color(hintLbl_, PaxxTheme::muted(true), LV_PART_MAIN);
+    lv_obj_set_style_text_color(hintLbl_, PaxxTheme::muted(), LV_PART_MAIN);
     lv_label_set_text(hintLbl_, "Access code is on the printer under Settings > WLAN. Cloud mode is fine — LAN Only is not required.");
 
     lv_obj_t *scanBtn = lv_button_create(screen_);
@@ -662,7 +715,7 @@ void PrinterManagerScreen::create(CupboardApp *app, lv_obj_t *parent) {
     hintLbl_ = lv_label_create(screen_);
     paxx_set_form_width(hintLbl_);
     lv_obj_align(hintLbl_, LV_ALIGN_TOP_MID, 0, 52);
-    lv_obj_set_style_text_color(hintLbl_, PaxxTheme::muted(true), LV_PART_MAIN);
+    lv_obj_set_style_text_color(hintLbl_, PaxxTheme::muted(), LV_PART_MAIN);
 
     list_ = lv_obj_create(screen_);
     paxx_set_form_width(list_);
@@ -702,7 +755,7 @@ void PrinterManagerScreen::rebuildList() {
 
         lv_obj_t *row = lv_obj_create(list_);
         lv_obj_set_size(row, LV_PCT(100), 64);
-        lv_obj_set_style_bg_color(row, PaxxTheme::surface(true), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(row, PaxxTheme::surface(), LV_PART_MAIN);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_hor(row, 10, LV_PART_MAIN);
@@ -718,7 +771,7 @@ void PrinterManagerScreen::rebuildList() {
         lv_obj_align(n, LV_ALIGN_TOP_LEFT, 0, 4);
         lv_obj_t *h = lv_label_create(info);
         lv_label_set_text(h, p.ip[0] ? p.ip : "No IP");
-        lv_obj_set_style_text_color(h, PaxxTheme::muted(true), LV_PART_MAIN);
+        lv_obj_set_style_text_color(h, PaxxTheme::muted(), LV_PART_MAIN);
         lv_obj_align(h, LV_ALIGN_BOTTOM_LEFT, 0, -4);
 
         lv_obj_t *edit = lv_button_create(row);
@@ -899,6 +952,254 @@ void WifiScreen::applyNetworkList(const std::vector<WifiNetwork> &nets) {
     char status[48];
     snprintf(status, sizeof(status), "Found %u - tap a network", static_cast<unsigned>(networks_.size()));
     setStatus(status);
+}
+
+void ThemeScreen::create(CupboardApp *app, lv_obj_t *parent) {
+    app_ = app;
+    screen_ = lv_obj_create(parent);
+    lv_obj_set_size(screen_, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
+    lv_obj_set_style_border_width(screen_, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(screen_, 0, LV_PART_MAIN);
+    paxx_style_form_screen(screen_);
+    paxx_create_nav_bar(screen_, "Theme", farm_back_fleet_cb, app, true);
+
+    lv_obj_t *sizeLbl = lv_label_create(screen_);
+    lv_label_set_text(sizeLbl, "Text size");
+    lv_obj_align(sizeLbl, LV_ALIGN_TOP_LEFT, 24, 64);
+
+    static const char *kSizes[] = {"S", "M", "L"};
+    for (int i = 0; i < 3; ++i) {
+        sizeBtns_[i] = lv_button_create(screen_);
+        lv_obj_set_size(sizeBtns_[i], 88, 44);
+        lv_obj_align(sizeBtns_[i], LV_ALIGN_TOP_LEFT, 24 + i * 100, 96);
+        lv_obj_set_user_data(sizeBtns_[i], reinterpret_cast<void *>(static_cast<intptr_t>(i)));
+        lv_obj_add_event_cb(sizeBtns_[i], onSize, LV_EVENT_CLICKED, this);
+        lv_obj_t *lbl = lv_label_create(sizeBtns_[i]);
+        lv_label_set_text(lbl, kSizes[i]);
+        lv_obj_center(lbl);
+    }
+
+    lv_obj_t *themeLbl = lv_label_create(screen_);
+    lv_label_set_text(themeLbl, "Theme");
+    lv_obj_align(themeLbl, LV_ALIGN_TOP_LEFT, 24, 156);
+
+    const int count = static_cast<int>(UiTheme::Count);
+    for (int i = 0; i < count; ++i) {
+        const int col = i % 2;
+        const int row = i / 2;
+        themeBtns_[i] = lv_button_create(screen_);
+        lv_obj_set_size(themeBtns_[i], 360, 52);
+        lv_obj_align(themeBtns_[i], LV_ALIGN_TOP_LEFT, 24 + col * 384, 188 + row * 60);
+        lv_obj_set_user_data(themeBtns_[i], reinterpret_cast<void *>(static_cast<intptr_t>(i)));
+        lv_obj_add_event_cb(themeBtns_[i], onTheme, LV_EVENT_CLICKED, this);
+        lv_obj_set_style_pad_hor(themeBtns_[i], 12, LV_PART_MAIN);
+        lv_obj_set_flex_flow(themeBtns_[i], LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(themeBtns_[i], LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(themeBtns_[i], 12, LV_PART_MAIN);
+
+        const UiTheme theme = static_cast<UiTheme>(i);
+        lv_obj_t *swatch = lv_obj_create(themeBtns_[i]);
+        lv_obj_set_size(swatch, 32, 32);
+        lv_obj_set_style_radius(swatch, 6, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(swatch, PaxxTheme::preview(theme), LV_PART_MAIN);
+        lv_obj_set_style_border_width(swatch, 1, LV_PART_MAIN);
+        lv_obj_set_style_border_color(swatch, lv_color_hex(0x888888), LV_PART_MAIN);
+        lv_obj_set_style_pad_all(swatch, 6, LV_PART_MAIN);
+        paxx_disable_input(swatch);
+
+        lv_obj_t *dot = lv_obj_create(swatch);
+        lv_obj_set_size(dot, 14, 14);
+        lv_obj_center(dot);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(dot, PaxxTheme::previewAccent(theme), LV_PART_MAIN);
+        lv_obj_set_style_border_width(dot, 0, LV_PART_MAIN);
+        paxx_disable_input(dot);
+
+        lv_obj_t *name = lv_label_create(themeBtns_[i]);
+        lv_label_set_text(name, PaxxTheme::themeName(theme));
+    }
+}
+
+void ThemeScreen::onEnter() { refresh(); }
+
+void ThemeScreen::refresh() {
+    if (!screen_) return;
+    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(screen_, PaxxTheme::text(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(screen_, PaxxTheme::fontBody(), LV_PART_MAIN);
+
+    if (lv_obj_t *bar = lv_obj_get_child(screen_, 0)) {
+        lv_obj_set_style_bg_color(bar, PaxxTheme::surface(), LV_PART_MAIN);
+        const uint32_t n = lv_obj_get_child_count(bar);
+        for (uint32_t i = 0; i < n; ++i) {
+            lv_obj_t *child = lv_obj_get_child(bar, i);
+            if (lv_obj_check_type(child, &lv_label_class)) {
+                lv_obj_set_style_text_font(child, PaxxTheme::fontTitle(), LV_PART_MAIN);
+                lv_obj_set_style_text_color(child, PaxxTheme::text(), LV_PART_MAIN);
+            }
+        }
+    }
+
+    const int selSize = static_cast<int>(PaxxTheme::textSize());
+    for (int i = 0; i < 3; ++i) {
+        if (!sizeBtns_[i]) continue;
+        lv_obj_set_style_bg_color(sizeBtns_[i],
+                                  i == selSize ? PaxxTheme::primary() : PaxxTheme::surface(), LV_PART_MAIN);
+        if (lv_obj_t *lbl = lv_obj_get_child(sizeBtns_[i], 0)) {
+            lv_obj_set_style_text_font(lbl, PaxxTheme::fontTitle(), LV_PART_MAIN);
+            lv_obj_set_style_text_color(lbl, PaxxTheme::text(), LV_PART_MAIN);
+        }
+    }
+
+    const int selTheme = static_cast<int>(PaxxTheme::theme());
+    const int count = static_cast<int>(UiTheme::Count);
+    for (int i = 0; i < count; ++i) {
+        if (!themeBtns_[i]) continue;
+        const bool on = i == selTheme;
+        lv_obj_set_style_bg_color(themeBtns_[i], on ? PaxxTheme::primary() : PaxxTheme::surface(), LV_PART_MAIN);
+        lv_obj_set_style_border_width(themeBtns_[i], on ? 2 : 1, LV_PART_MAIN);
+        lv_obj_set_style_border_color(themeBtns_[i], on ? PaxxTheme::accent() : PaxxTheme::header(), LV_PART_MAIN);
+        const uint32_t n = lv_obj_get_child_count(themeBtns_[i]);
+        for (uint32_t c = 0; c < n; ++c) {
+            lv_obj_t *child = lv_obj_get_child(themeBtns_[i], c);
+            if (lv_obj_check_type(child, &lv_label_class)) {
+                lv_obj_set_style_text_font(child, PaxxTheme::fontBody(), LV_PART_MAIN);
+                lv_obj_set_style_text_color(child, PaxxTheme::text(), LV_PART_MAIN);
+            }
+        }
+    }
+}
+
+void ThemeScreen::onSize(lv_event_t *e) {
+    auto *self = static_cast<ThemeScreen *>(lv_event_get_user_data(e));
+    lv_obj_t *btn = lv_event_get_current_target_obj(e);
+    const int i = static_cast<int>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn)));
+    if (i < 0 || i > static_cast<int>(UiTextSize::Large) || !self->app_) return;
+    self->app_->setAppearance(PaxxTheme::theme(), static_cast<UiTextSize>(i));
+}
+
+void ThemeScreen::onTheme(lv_event_t *e) {
+    auto *self = static_cast<ThemeScreen *>(lv_event_get_user_data(e));
+    lv_obj_t *btn = lv_event_get_current_target_obj(e);
+    const int i = static_cast<int>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn)));
+    if (i < 0 || i >= static_cast<int>(UiTheme::Count) || !self->app_) return;
+    self->app_->setAppearance(static_cast<UiTheme>(i), PaxxTheme::textSize());
+}
+
+void DisplayScreen::create(CupboardApp *app, lv_obj_t *parent) {
+    app_ = app;
+    screen_ = lv_obj_create(parent);
+    lv_obj_set_size(screen_, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
+    lv_obj_set_style_border_width(screen_, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(screen_, 0, LV_PART_MAIN);
+    paxx_style_form_screen(screen_);
+    paxx_create_nav_bar(screen_, "Display", farm_back_fleet_cb, app, true);
+
+    auto makeRow = [&](const char *title, const char *hint, int y, lv_obj_t **slider, lv_obj_t **val,
+                       int32_t minV, int32_t maxV, int kind) {
+        lv_obj_t *lbl = lv_label_create(screen_);
+        lv_label_set_text(lbl, title);
+        lv_obj_set_style_text_font(lbl, PaxxTheme::fontTitle(), LV_PART_MAIN);
+        lv_obj_align(lbl, LV_ALIGN_TOP_LEFT, 24, y);
+
+        *val = lv_label_create(screen_);
+        lv_obj_align(*val, LV_ALIGN_TOP_RIGHT, -24, y);
+
+        *slider = lv_slider_create(screen_);
+        lv_slider_set_range(*slider, minV, maxV);
+        lv_obj_set_width(*slider, kPaxxFormWidth);
+        lv_obj_align(*slider, LV_ALIGN_TOP_MID, 0, y + 36);
+        lv_obj_set_height(*slider, 22);
+        lv_obj_set_user_data(*slider, reinterpret_cast<void *>(static_cast<intptr_t>(kind)));
+        lv_obj_add_event_cb(*slider, onSlider, LV_EVENT_VALUE_CHANGED, this);
+        lv_obj_add_event_cb(*slider, onSlider, LV_EVENT_RELEASED, this);
+        lv_obj_set_style_bg_color(*slider, PaxxTheme::header(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(*slider, PaxxTheme::primary(), LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(*slider, PaxxTheme::primary(), LV_PART_KNOB);
+
+        lv_obj_t *hintLbl = lv_label_create(screen_);
+        lv_label_set_text(hintLbl, hint);
+        lv_obj_set_style_text_color(hintLbl, PaxxTheme::muted(), LV_PART_MAIN);
+        lv_obj_align(hintLbl, LV_ALIGN_TOP_LEFT, 24, y + 68);
+    };
+
+    makeRow("Brightness", "Live backlight level", 64, &brightSlider_, &brightVal_, 1, 100, 0);
+    makeRow("Dim Time", "Dim to 10% after idle. 0 = do not dim", 160, &dimSlider_, &dimVal_, 0, 600, 1);
+    makeRow("Sleep Time", "Turn off after idle. 0 = keep display on", 270, &sleepSlider_, &sleepVal_, 0, 1800, 2);
+}
+
+void DisplayScreen::onEnter() {
+    if (!app_ || !brightSlider_) return;
+    loading_ = true;
+    lv_slider_set_value(brightSlider_, app_->config().brightness, LV_ANIM_OFF);
+    lv_slider_set_value(dimSlider_, app_->config().dimSec, LV_ANIM_OFF);
+    lv_slider_set_value(sleepSlider_, app_->config().sleepSec, LV_ANIM_OFF);
+    loading_ = false;
+    updateLabels();
+    refresh();
+}
+
+void DisplayScreen::updateLabels() {
+    if (brightVal_ && brightSlider_) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(lv_slider_get_value(brightSlider_)));
+        lv_label_set_text(brightVal_, buf);
+    }
+    if (dimVal_ && dimSlider_) {
+        char buf[24];
+        formatTimeout(static_cast<uint16_t>(lv_slider_get_value(dimSlider_)), buf, sizeof(buf));
+        lv_label_set_text(dimVal_, buf);
+    }
+    if (sleepVal_ && sleepSlider_) {
+        char buf[24];
+        formatTimeout(static_cast<uint16_t>(lv_slider_get_value(sleepSlider_)), buf, sizeof(buf));
+        lv_label_set_text(sleepVal_, buf);
+    }
+}
+
+void DisplayScreen::applyFromSliders(bool save) {
+    if (!app_ || !brightSlider_ || !dimSlider_ || !sleepSlider_) return;
+    app_->applyDisplaySettings(static_cast<uint8_t>(lv_slider_get_value(brightSlider_)),
+                               static_cast<uint16_t>(lv_slider_get_value(dimSlider_)),
+                               static_cast<uint16_t>(lv_slider_get_value(sleepSlider_)),
+                               save);
+    updateLabels();
+}
+
+void DisplayScreen::commit() {
+    applyFromSliders(true);
+}
+
+void DisplayScreen::onSlider(lv_event_t *e) {
+    auto *self = static_cast<DisplayScreen *>(lv_event_get_user_data(e));
+    if (!self || self->loading_) return;
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_VALUE_CHANGED) self->applyFromSliders(false);
+    else if (code == LV_EVENT_RELEASED) self->applyFromSliders(true);
+}
+
+void DisplayScreen::refresh() {
+    if (!screen_) return;
+    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(screen_, PaxxTheme::text(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(screen_, PaxxTheme::fontBody(), LV_PART_MAIN);
+    if (lv_obj_t *bar = lv_obj_get_child(screen_, 0)) {
+        lv_obj_set_style_bg_color(bar, PaxxTheme::surface(), LV_PART_MAIN);
+    }
+    auto styleSlider = [](lv_obj_t *slider) {
+        if (!slider) return;
+        lv_obj_set_style_bg_color(slider, PaxxTheme::header(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(slider, PaxxTheme::primary(), LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(slider, PaxxTheme::primary(), LV_PART_KNOB);
+    };
+    styleSlider(brightSlider_);
+    styleSlider(dimSlider_);
+    styleSlider(sleepSlider_);
+    if (brightVal_) lv_obj_set_style_text_color(brightVal_, PaxxTheme::text(), LV_PART_MAIN);
+    if (dimVal_) lv_obj_set_style_text_color(dimVal_, PaxxTheme::text(), LV_PART_MAIN);
+    if (sleepVal_) lv_obj_set_style_text_color(sleepVal_, PaxxTheme::text(), LV_PART_MAIN);
 }
 
 void SettingsScreen::setHint(const char *text) {

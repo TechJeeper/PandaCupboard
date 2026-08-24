@@ -1,18 +1,49 @@
 #pragma once
 
 #include <lvgl.h>
+#include <cstdint>
+
+enum class UiTheme : uint8_t {
+    Night = 0,
+    DarkGray,
+    Ocean,
+    Forest,
+    Light,
+    Count
+};
+
+enum class UiTextSize : uint8_t {
+    Small = 0,
+    Medium,
+    Large
+};
 
 namespace PaxxTheme {
-    inline lv_color_t primary() { return lv_color_hex(0x2563EB); }
-    inline lv_color_t accent() { return lv_color_hex(0x10B981); }
-    inline lv_color_t warn() { return lv_color_hex(0xF59E0B); }
-    inline lv_color_t danger() { return lv_color_hex(0xEF4444); }
-    inline lv_color_t bg(bool dark = true) { return lv_color_hex(dark ? 0x111827 : 0xF3F4F6); }
-    inline lv_color_t surface(bool dark = true) { return lv_color_hex(dark ? 0x1F2937 : 0xFFFFFF); }
-    inline lv_color_t text(bool dark = true) { return lv_color_hex(dark ? 0xF9FAFB : 0x111827); }
-    inline lv_color_t muted(bool dark = true) { return lv_color_hex(dark ? 0x9CA3AF : 0x6B7280); }
+    void set(UiTheme theme, UiTextSize textSize);
+    void apply();
+    UiTheme theme();
+    UiTextSize textSize();
+    bool isDark();
+    const char *themeName(UiTheme theme);
 
-    void apply(bool dark = true);
+    lv_color_t primary();
+    lv_color_t accent();
+    lv_color_t warn();
+    lv_color_t danger();
+    lv_color_t bg(bool dark = true);
+    lv_color_t surface(bool dark = true);
+    lv_color_t header();
+    lv_color_t row();
+    lv_color_t rowAlt();
+    lv_color_t text(bool dark = true);
+    lv_color_t muted(bool dark = true);
+    lv_color_t preview(UiTheme theme);
+    lv_color_t previewAccent(UiTheme theme);
+
+    const lv_font_t *fontBody();
+    const lv_font_t *fontTitle();
+    const lv_font_t *fontLarge();
+    int rowHeight();
 }
 
 lv_obj_t *paxx_create_nav_bar(lv_obj_t *parent, const char *title, lv_event_cb_t backCb, void *userData,

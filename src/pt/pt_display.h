@@ -194,11 +194,17 @@ static void pt_init_backlight(uint8_t set_percent)
   }
 }
 
-/** Keep the panel lit — RGB backlight has no wake path except power cycle once off. */
+void pt_display_set_policy(uint8_t brightness, uint16_t dimSec, uint16_t sleepSec);
+void pt_display_set_brightness(uint8_t percent);
+void pt_display_note_activity();
+void pt_display_tick();
+bool pt_display_on_touch();
+void pt_display_on_release();
+
+/** Restore user brightness and reset idle timers (touch / settings). */
 inline void pt_keep_display_awake()
 {
-  if (pt_backlight_percent < 1) pt_backlight_percent = 100;
-  pt_set_backlight(pt_backlight_percent, false);
+  pt_display_note_activity();
 }
 
 /* =========================
@@ -265,8 +271,11 @@ inline void pt_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
   pt_touchpanel.read(); // Read touch data
   if (pt_touchpanel.isTouched)
   {
-    // Any touch restores backlight (no HW wake if PWM duty collapsed).
-    pt_keep_display_awake();
+    // First tap after sleep only wakes the panel; later taps go to LVGL.
+    if (pt_display_on_touch()) {
+      data->state = LV_INDEV_STATE_RELEASED;
+      return;
+    }
     for (int i = 0; i < pt_touchpanel.touches; i++)
     {
       if (i == 0)
@@ -279,6 +288,7 @@ inline void pt_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
   }
   else
   {
+    pt_display_on_release();
     data->state = LV_INDEV_STATE_RELEASED;
   }
 }
@@ -306,9 +316,9 @@ inline void pt_setup_display(PT_LVGL_render_method_t mode = (PT_LVGL_render_meth
   digitalWrite(PT_LCD_RESET_PIN, 1);
   delay(10);
 
-  // Backlight setup — stay fully on (no auto-sleep / dim path in this firmware).
+  // Backlight starts at 100%; app.begin() applies saved brightness / dim / sleep.
   pt_init_backlight(100);
-  pt_keep_display_awake();
+  pt_display_note_activity();
 
   // Panel bring-up
   pt_gfx.begin();
@@ -507,14 +517,13 @@ inline void pt_refresh_display() { pt_display_resync_and_redraw(); }
 
 inline void pt_loop_display()
 {
-  static uint32_t lastKeepAwakeMs = 0;
+  static uint32_t lastPolicyMs = 0;
   static uint32_t lastResyncMs = 0;
   lv_timer_handler();
-  // Reassert backlight periodically so the panel cannot "go to sleep" silently.
   const uint32_t now = millis();
-  if (now - lastKeepAwakeMs >= 3000) {
-    lastKeepAwakeMs = now;
-    pt_keep_display_awake();
+  if (now - lastPolicyMs >= 250) {
+    lastPolicyMs = now;
+    pt_display_tick();
   }
   // Heal idle RGB desync (vertical wrap) without a full reboot.
   if (now - lastResyncMs >= 5000) {

@@ -12,7 +12,9 @@
 void CupboardApp::begin() {
     CupboardPreferences::instance().begin();
     CupboardPreferences::instance().load(config_);
-    PaxxTheme::apply(config_.darkTheme);
+    PaxxTheme::set(config_.uiTheme, config_.textSize);
+    PaxxTheme::apply();
+    pt_display_set_policy(config_.brightness, config_.dimSec, config_.sleepSec);
     buildShell();
     PaxxNotify::init(shell_);
     BambuFleet::instance().begin(&config_, &discovery_);
@@ -58,7 +60,46 @@ void CupboardApp::begin() {
 }
 
 void CupboardApp::saveConfig() {
+    config_.darkTheme = PaxxTheme::isDark();
+    config_.uiTheme = PaxxTheme::theme();
+    config_.textSize = PaxxTheme::textSize();
     CupboardPreferences::instance().save(config_);
+}
+
+void CupboardApp::applyAppearance() {
+    PaxxTheme::set(config_.uiTheme, config_.textSize);
+    PaxxTheme::apply();
+    if (shell_) {
+        lv_obj_set_style_bg_color(shell_, PaxxTheme::bg(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(shell_, PaxxTheme::text(), LV_PART_MAIN);
+        lv_obj_set_style_text_font(shell_, PaxxTheme::fontBody(), LV_PART_MAIN);
+    }
+    if (gearBtn_) lv_obj_set_style_bg_color(gearBtn_, PaxxTheme::surface(), LV_PART_MAIN);
+    if (gearMenu_) lv_obj_set_style_bg_color(gearMenu_, PaxxTheme::surface(), LV_PART_MAIN);
+    fleet_.onEnter();
+    themeScreen_.refresh();
+    paxx_ui_refresh();
+}
+
+void CupboardApp::applyDisplaySettings(uint8_t brightness, uint16_t dimSec, uint16_t sleepSec, bool save) {
+    if (brightness < 1) brightness = 1;
+    if (brightness > 100) brightness = 100;
+    if (dimSec > 600) dimSec = 600;
+    if (sleepSec > 1800) sleepSec = 1800;
+    config_.brightness = brightness;
+    config_.dimSec = dimSec;
+    config_.sleepSec = sleepSec;
+    pt_display_set_policy(brightness, dimSec, sleepSec);
+    if (save) saveConfig();
+}
+
+void CupboardApp::setAppearance(UiTheme theme, UiTextSize textSize) {
+    config_.uiTheme = theme;
+    config_.textSize = textSize;
+    PaxxTheme::set(theme, textSize);
+    config_.darkTheme = PaxxTheme::isDark();
+    applyAppearance();
+    saveConfig();
 }
 
 bool CupboardApp::addPrinter() {
@@ -88,7 +129,7 @@ bool CupboardApp::removePrinter(int index) {
         config_.editIndex = config_.printerCount > 0 ? config_.printerCount - 1 : 0;
     }
     saveConfig();
-    BambuFleet::instance().reload();
+    BambuFleet::instance().forgetPrinter(index);
     return true;
 }
 
@@ -232,7 +273,7 @@ void CupboardApp::buildGearMenu() {
     lv_obj_center(icon);
 
     gearMenu_ = lv_obj_create(shell_);
-    lv_obj_set_size(gearMenu_, 240, 292);
+    lv_obj_set_size(gearMenu_, 240, 390);
     lv_obj_align(gearMenu_, LV_ALIGN_TOP_RIGHT, -8, 52);
     lv_obj_set_style_bg_color(gearMenu_, PaxxTheme::surface(isDark()), LV_PART_MAIN);
     lv_obj_set_style_border_width(gearMenu_, 1, LV_PART_MAIN);
@@ -270,6 +311,16 @@ void CupboardApp::buildGearMenu() {
     addItem(LV_SYMBOL_REFRESH "  Refresh Display", [](lv_event_t *e) {
         static_cast<CupboardApp *>(lv_event_get_user_data(e))->refreshDisplay();
     });
+    addItem(LV_SYMBOL_TINT "  Theme", [](lv_event_t *e) {
+        auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
+        app->hideGearMenu();
+        app->showTheme();
+    });
+    addItem(LV_SYMBOL_IMAGE "  Display", [](lv_event_t *e) {
+        auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
+        app->hideGearMenu();
+        app->showDisplay();
+    });
     addItem(LV_SYMBOL_SETTINGS "  About", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
@@ -299,6 +350,8 @@ void CupboardApp::buildShell() {
     setup_.create(this, content_);
     printerManager_.create(this, content_);
     wifiScreen_.create(this, content_);
+    themeScreen_.create(this, content_);
+    displayScreen_.create(this, content_);
     settings_.create(this, content_);
 
     lv_screen_load(shell_);
@@ -338,6 +391,9 @@ void CupboardApp::applyPendingScreen() {
 }
 
 void CupboardApp::presentScreen(lv_obj_t *screen, const char *tickKind) {
+    if (activeScreen_ == displayScreen_.root() && screen != displayScreen_.root()) {
+        displayScreen_.commit();
+    }
     showGlobalLoading(false);
     hideGearMenu();
     PaxxKeyboard::hide();
@@ -347,6 +403,8 @@ void CupboardApp::presentScreen(lv_obj_t *screen, const char *tickKind) {
     lv_obj_add_flag(setup_.root(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(printerManager_.root(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(wifiScreen_.root(), LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(themeScreen_.root(), LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(displayScreen_.root(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(settings_.root(), LV_OBJ_FLAG_HIDDEN);
 
     activeScreen_ = screen;
@@ -358,6 +416,8 @@ void CupboardApp::presentScreen(lv_obj_t *screen, const char *tickKind) {
     else if (screen == setup_.root()) setup_.onEnter();
     else if (screen == printerManager_.root()) printerManager_.onEnter();
     else if (screen == wifiScreen_.root()) wifiScreen_.onEnter();
+    else if (screen == themeScreen_.root()) themeScreen_.onEnter();
+    else if (screen == displayScreen_.root()) displayScreen_.onEnter();
 
     if (gearBtn_) lv_obj_move_foreground(gearBtn_);
     paxx_ui_refresh();
@@ -376,6 +436,8 @@ void CupboardApp::showPrinter(int index) {
 void CupboardApp::showSetup() { showScreen(setup_.root()); }
 void CupboardApp::showPrinterManager() { showScreen(printerManager_.root()); }
 void CupboardApp::showWifi() { showScreen(wifiScreen_.root()); }
+void CupboardApp::showTheme() { showScreen(themeScreen_.root()); }
+void CupboardApp::showDisplay() { showScreen(displayScreen_.root()); }
 void CupboardApp::showSettings() { showScreen(settings_.root()); }
 
 void farm_back_fleet_cb(lv_event_t *e) {

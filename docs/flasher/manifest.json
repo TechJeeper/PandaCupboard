@@ -1,6 +1,6 @@
 {
   "name": "PandaCupboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bambu Lab cupboard dashboard for BTT K-Touch / PandaTouch — Studio-style fleet list with pause, resume, stop, and LAN MQTT",
   "chip": "ESP32-S3",
   "hardware": "BTT K-Touch / PandaTouch (ESP32-S3, 8 MB PSRAM)",

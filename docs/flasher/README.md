@@ -22,10 +22,10 @@ https://techjeeper.github.io/PandaCupboard/flasher/
 ## Creating a flashable release
 
 ```powershell
-.\scripts\package-firmware.ps1 -Version "0.1.0"
+.\scripts\package-firmware.ps1 -Version "0.2.0"
 ```
 
-Upload the files from `dist/firmware/` as assets on a GitHub Release tagged `v0.1.0`:
+Upload the files from `dist/firmware/` as assets on a GitHub Release tagged `v0.2.0`:
 
 | Asset | Flash offset |
 |-------|----------------|

@@ -2,30 +2,121 @@
 
 #include <string.h>
 
+namespace {
+struct Palette {
+    const char *name;
+    uint32_t bg;
+    uint32_t surface;
+    uint32_t header;
+    uint32_t row;
+    uint32_t rowAlt;
+    uint32_t text;
+    uint32_t muted;
+    uint32_t primary;
+    uint32_t accent;
+    uint32_t warn;
+    uint32_t danger;
+    bool dark;
+};
+
+constexpr Palette kPalettes[] = {
+    {"Night", 0x111827, 0x1F2937, 0x1F2937, 0x111827, 0x0B1220, 0xF9FAFB, 0x9CA3AF, 0x2563EB, 0x10B981, 0xF59E0B,
+     0xEF4444, true},
+    {"Dark Gray", 0x1C1C1C, 0x2C2C2C, 0x333333, 0x1C1C1C, 0x252525, 0xEEEEEE, 0x9E9E9E, 0x6B7280, 0x22C55E, 0xF59E0B,
+     0xEF4444, true},
+    {"Ocean", 0x0B1620, 0x132433, 0x1A3348, 0x0B1620, 0x102030, 0xE2E8F0, 0x94A3B8, 0x0EA5E9, 0x22D3EE, 0xF59E0B,
+     0xF43F5E, true},
+    {"Forest", 0x101A14, 0x1B2B22, 0x234032, 0x101A14, 0x16241C, 0xECFDF3, 0x86A89A, 0x16A34A, 0x84CC16, 0xF59E0B,
+     0xEF4444, true},
+    {"Light", 0xF3F4F6, 0xFFFFFF, 0xE5E7EB, 0xFFFFFF, 0xF3F4F6, 0x111827, 0x6B7280, 0x2563EB, 0x059669, 0xD97706,
+     0xDC2626, false},
+};
+
+UiTheme gTheme = UiTheme::Night;
+UiTextSize gTextSize = UiTextSize::Medium;
+
+const Palette &palette(UiTheme theme) {
+    const int i = static_cast<int>(theme);
+    if (i < 0 || i >= static_cast<int>(UiTheme::Count)) return kPalettes[0];
+    return kPalettes[i];
+}
+
+const Palette &cur() { return palette(gTheme); }
+}  // namespace
+
+void PaxxTheme::set(UiTheme theme, UiTextSize textSize) {
+    gTheme = theme;
+    gTextSize = textSize;
+}
+
+void PaxxTheme::apply() {
+    lv_theme_t *theme = lv_theme_default_init(
+        lv_display_get_default(),
+        primary(), text(), isDark(),
+        fontBody());
+    lv_display_set_theme(lv_display_get_default(), theme);
+
+    lv_obj_t *scr = lv_scr_act();
+    if (!scr) return;
+    lv_obj_set_style_bg_color(scr, bg(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(scr, text(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(scr, fontBody(), LV_PART_MAIN);
+}
+
+UiTheme PaxxTheme::theme() { return gTheme; }
+UiTextSize PaxxTheme::textSize() { return gTextSize; }
+bool PaxxTheme::isDark() { return cur().dark; }
+const char *PaxxTheme::themeName(UiTheme theme) { return palette(theme).name; }
+
+lv_color_t PaxxTheme::primary() { return lv_color_hex(cur().primary); }
+lv_color_t PaxxTheme::accent() { return lv_color_hex(cur().accent); }
+lv_color_t PaxxTheme::warn() { return lv_color_hex(cur().warn); }
+lv_color_t PaxxTheme::danger() { return lv_color_hex(cur().danger); }
+lv_color_t PaxxTheme::bg(bool) { return lv_color_hex(cur().bg); }
+lv_color_t PaxxTheme::surface(bool) { return lv_color_hex(cur().surface); }
+lv_color_t PaxxTheme::header() { return lv_color_hex(cur().header); }
+lv_color_t PaxxTheme::row() { return lv_color_hex(cur().row); }
+lv_color_t PaxxTheme::rowAlt() { return lv_color_hex(cur().rowAlt); }
+lv_color_t PaxxTheme::text(bool) { return lv_color_hex(cur().text); }
+lv_color_t PaxxTheme::muted(bool) { return lv_color_hex(cur().muted); }
+lv_color_t PaxxTheme::preview(UiTheme theme) { return lv_color_hex(palette(theme).bg); }
+lv_color_t PaxxTheme::previewAccent(UiTheme theme) { return lv_color_hex(palette(theme).accent); }
+
+const lv_font_t *PaxxTheme::fontBody() {
+    if (gTextSize == UiTextSize::Small) return &lv_font_montserrat_14;
+    if (gTextSize == UiTextSize::Large) return &lv_font_montserrat_18;
+    return &lv_font_montserrat_16;
+}
+
+const lv_font_t *PaxxTheme::fontTitle() {
+    if (gTextSize == UiTextSize::Small) return &lv_font_montserrat_16;
+    if (gTextSize == UiTextSize::Large) return &lv_font_montserrat_20;
+    return &lv_font_montserrat_18;
+}
+
+const lv_font_t *PaxxTheme::fontLarge() {
+    if (gTextSize == UiTextSize::Small) return &lv_font_montserrat_18;
+    return &lv_font_montserrat_20;
+}
+
+int PaxxTheme::rowHeight() {
+    if (gTextSize == UiTextSize::Small) return 44;
+    if (gTextSize == UiTextSize::Large) return 56;
+    return 48;
+}
+
 void paxx_disable_input(lv_obj_t *obj) {
     if (!obj) return;
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
 }
 
-void PaxxTheme::apply(bool dark) {
-    lv_theme_t *theme = lv_theme_default_init(
-        lv_display_get_default(),
-        primary(), lv_color_hex(0xFFFFFF), dark,
-        LV_FONT_DEFAULT);
-    lv_display_set_theme(lv_display_get_default(), theme);
-
-    lv_obj_t *scr = lv_scr_act();
-    lv_obj_set_style_bg_color(scr, bg(dark), LV_PART_MAIN);
-    lv_obj_set_style_text_color(scr, text(dark), LV_PART_MAIN);
-}
-
-lv_obj_t *paxx_create_nav_bar(lv_obj_t *parent, const char *title, lv_event_cb_t backCb, void *userData, bool dark,
+lv_obj_t *paxx_create_nav_bar(lv_obj_t *parent, const char *title, lv_event_cb_t backCb, void *userData, bool /*dark*/,
                               lv_obj_t **outBackBtn) {
     lv_obj_t *bar = lv_obj_create(parent);
     lv_obj_set_size(bar, LV_PCT(100), 48);
     lv_obj_align(bar, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_bg_color(bar, PaxxTheme::surface(dark), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar, PaxxTheme::surface(), LV_PART_MAIN);
     lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(bar, 8, LV_PART_MAIN);
     paxx_disable_input(bar);
@@ -34,6 +125,7 @@ lv_obj_t *paxx_create_nav_bar(lv_obj_t *parent, const char *title, lv_event_cb_t
         lv_obj_t *back = lv_btn_create(bar);
         lv_obj_set_size(back, 72, 32);
         lv_obj_align(back, LV_ALIGN_LEFT_MID, 0, 0);
+        lv_obj_set_style_bg_color(back, PaxxTheme::primary(), LV_PART_MAIN);
         lv_obj_add_event_cb(back, backCb, LV_EVENT_CLICKED, userData);
         lv_obj_t *lbl = lv_label_create(back);
         lv_label_set_text(lbl, LV_SYMBOL_LEFT " Back");
@@ -46,7 +138,8 @@ lv_obj_t *paxx_create_nav_bar(lv_obj_t *parent, const char *title, lv_event_cb_t
     lv_obj_t *ttl = lv_label_create(bar);
     lv_label_set_text(ttl, title);
     lv_obj_align(ttl, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_text_font(ttl, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_text_font(ttl, PaxxTheme::fontTitle(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(ttl, PaxxTheme::text(), LV_PART_MAIN);
     return bar;
 }
 

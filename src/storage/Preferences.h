@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bambu/BambuTypes.h"
+#include "ui/Theme.h"
 #include <Preferences.h>
 
 struct WifiConfig {
@@ -15,6 +16,11 @@ struct AppConfig {
     int editIndex;
     bool darkTheme;
     FleetSort fleetSort;
+    UiTheme uiTheme;
+    UiTextSize textSize;
+    uint8_t brightness;
+    uint16_t dimSec;
+    uint16_t sleepSec;
 };
 
 class CupboardPreferences {
