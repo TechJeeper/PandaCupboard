@@ -117,6 +117,8 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_set_width(titleLbl_, 420);
     lv_label_set_long_mode(titleLbl_, LV_LABEL_LONG_CLIP);
     lv_obj_align(titleLbl_, LV_ALIGN_LEFT_MID, 0, 0);
+    paxx_mark_accent_text(titleLbl_);
+    lv_obj_set_style_text_color(titleLbl_, PaxxTheme::accent(), LV_PART_MAIN);
 
     lv_obj_t *addBtn = lv_button_create(titleBar_);
     lv_obj_set_size(addBtn, 48, 36);
@@ -124,7 +126,9 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_add_event_cb(addBtn, [](lv_event_t *e) {
         static_cast<CupboardApp *>(lv_event_get_user_data(e))->addPrinter();
     }, LV_EVENT_CLICKED, app);
-    lv_label_set_text(lv_label_create(addBtn), LV_SYMBOL_PLUS);
+    paxx_set_centered_icon(addBtn, LV_SYMBOL_PLUS);
+    paxx_mark_accent_fill(addBtn);
+    lv_obj_set_style_bg_color(addBtn, PaxxTheme::accent(), LV_PART_MAIN);
 
     header_ = lv_obj_create(screen_);
     lv_obj_set_size(header_, LV_PCT(100), 36);
@@ -186,7 +190,7 @@ void FleetScreen::onEnter() {
     if (titleBar_) lv_obj_set_style_bg_color(titleBar_, PaxxTheme::bg(), LV_PART_MAIN);
     if (titleLbl_) {
         lv_obj_set_style_text_font(titleLbl_, PaxxTheme::fontTitle(), LV_PART_MAIN);
-        lv_obj_set_style_text_color(titleLbl_, PaxxTheme::text(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(titleLbl_, PaxxTheme::accent(), LV_PART_MAIN);
     }
     if (header_) {
         lv_obj_set_style_bg_color(header_, PaxxTheme::header(), LV_PART_MAIN);
@@ -250,10 +254,7 @@ void FleetScreen::rebuild() {
         }, LV_EVENT_CLICKED, app_);
 
         lv_obj_t *name = lv_label_create(row);
-        char nameBuf[48];
-        if (!st.online) snprintf(nameBuf, sizeof(nameBuf), "%s(Offline)", p.name[0] ? p.name : "Printer");
-        else snprintf(nameBuf, sizeof(nameBuf), "%s", p.name[0] ? p.name : "Printer");
-        lv_label_set_text(name, nameBuf);
+        lv_label_set_text(name, p.name[0] ? p.name : "Printer");
         lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_font(name, PaxxTheme::fontBody(), LV_PART_MAIN);
         lv_obj_set_style_text_color(name, PaxxTheme::text(), LV_PART_MAIN);

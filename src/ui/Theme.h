@@ -55,6 +55,10 @@ lv_obj_t *paxx_create_loading_arc(lv_obj_t *parent);
 void paxx_set_loading_visible(lv_obj_t *arc, lv_obj_t *label, bool visible, const char *text = nullptr);
 void paxx_style_form_screen(lv_obj_t *screen);
 void paxx_set_form_width(lv_obj_t *obj);
+lv_obj_t *paxx_set_centered_icon(lv_obj_t *btn, const char *symbol);
+void paxx_mark_accent_fill(lv_obj_t *obj);
+void paxx_mark_accent_text(lv_obj_t *obj);
+void paxx_apply_accent_chrome(lv_obj_t *root);
 
 constexpr int kPaxxFormWidth = 736;
 

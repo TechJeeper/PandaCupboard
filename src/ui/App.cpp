@@ -74,8 +74,9 @@ void CupboardApp::applyAppearance() {
         lv_obj_set_style_text_color(shell_, PaxxTheme::text(), LV_PART_MAIN);
         lv_obj_set_style_text_font(shell_, PaxxTheme::fontBody(), LV_PART_MAIN);
     }
-    if (gearBtn_) lv_obj_set_style_bg_color(gearBtn_, PaxxTheme::surface(), LV_PART_MAIN);
+    if (gearBtn_) lv_obj_set_style_bg_color(gearBtn_, PaxxTheme::accent(), LV_PART_MAIN);
     if (gearMenu_) lv_obj_set_style_bg_color(gearMenu_, PaxxTheme::surface(), LV_PART_MAIN);
+    paxx_apply_accent_chrome(shell_);
     fleet_.onEnter();
     themeScreen_.refresh();
     paxx_ui_refresh();
@@ -264,13 +265,12 @@ void CupboardApp::buildGearMenu() {
     gearBtn_ = lv_button_create(shell_);
     lv_obj_set_size(gearBtn_, 40, 40);
     lv_obj_align(gearBtn_, LV_ALIGN_TOP_RIGHT, -8, 6);
-    lv_obj_set_style_bg_color(gearBtn_, PaxxTheme::surface(isDark()), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(gearBtn_, PaxxTheme::accent(), LV_PART_MAIN);
+    paxx_mark_accent_fill(gearBtn_);
     lv_obj_add_event_cb(gearBtn_, [](lv_event_t *e) {
         static_cast<CupboardApp *>(lv_event_get_user_data(e))->toggleGearMenu();
     }, LV_EVENT_CLICKED, this);
-    lv_obj_t *icon = lv_label_create(gearBtn_);
-    lv_label_set_text(icon, LV_SYMBOL_SETTINGS);
-    lv_obj_center(icon);
+    paxx_set_centered_icon(gearBtn_, LV_SYMBOL_SETTINGS);
 
     gearMenu_ = lv_obj_create(shell_);
     lv_obj_set_size(gearMenu_, 240, 390);
@@ -283,54 +283,65 @@ void CupboardApp::buildGearMenu() {
     lv_obj_add_flag(gearMenu_, LV_OBJ_FLAG_HIDDEN);
     paxx_disable_input(gearMenu_);
 
-    auto addItem = [&](const char *label, lv_event_cb_t cb) {
+    auto addItem = [&](const char *icon, const char *label, lv_event_cb_t cb) {
         lv_obj_t *btn = lv_button_create(gearMenu_);
         lv_obj_set_width(btn, LV_PCT(100));
         lv_obj_set_height(btn, 40);
+        lv_obj_set_style_pad_all(btn, 0, LV_PART_MAIN);
+        lv_obj_set_layout(btn, LV_LAYOUT_NONE);
         lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, this);
+
+        lv_obj_t *ico = lv_label_create(btn);
+        lv_label_set_text(ico, icon);
+        lv_obj_set_style_text_font(ico, &lv_font_montserrat_16, LV_PART_MAIN);
+        lv_obj_align(ico, LV_ALIGN_LEFT_MID, 12, 0);
+        paxx_mark_accent_text(ico);
+
         lv_obj_t *lbl = lv_label_create(btn);
         lv_label_set_text(lbl, label);
-        lv_obj_center(lbl);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 0);
     };
 
-    addItem(LV_SYMBOL_HOME "  Farm", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_HOME, "Farm", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
         app->showFleet();
     });
-    addItem(LV_SYMBOL_WIFI "  WiFi Setup", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_WIFI, "WiFi Setup", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
         app->showWifi();
     });
-    addItem(LV_SYMBOL_LIST "  Printers", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_LIST, "Printers", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
         app->showPrinterManager();
     });
-    addItem(LV_SYMBOL_REFRESH "  Refresh Display", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_REFRESH, "Refresh Display", [](lv_event_t *e) {
         static_cast<CupboardApp *>(lv_event_get_user_data(e))->refreshDisplay();
     });
-    addItem(LV_SYMBOL_TINT "  Theme", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_TINT, "Theme", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
         app->showTheme();
     });
-    addItem(LV_SYMBOL_IMAGE "  Display", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_IMAGE, "Display", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
         app->showDisplay();
     });
-    addItem(LV_SYMBOL_SETTINGS "  About", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_SETTINGS, "About", [](lv_event_t *e) {
         auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
         app->hideGearMenu();
         app->showSettings();
     });
-    addItem(LV_SYMBOL_POWER "  Reboot", [](lv_event_t *e) {
+    addItem(LV_SYMBOL_POWER, "Reboot", [](lv_event_t *e) {
         static_cast<CupboardApp *>(lv_event_get_user_data(e))->hideGearMenu();
         ESP.restart();
     });
     lv_obj_move_foreground(gearBtn_);
+    paxx_apply_accent_chrome(shell_);
 }
 
 void CupboardApp::buildShell() {

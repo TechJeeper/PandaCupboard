@@ -22,7 +22,7 @@ struct Palette {
 constexpr Palette kPalettes[] = {
     {"Night", 0x111827, 0x1F2937, 0x1F2937, 0x111827, 0x0B1220, 0xF9FAFB, 0x9CA3AF, 0x2563EB, 0x10B981, 0xF59E0B,
      0xEF4444, true},
-    {"Dark Gray", 0x1C1C1C, 0x2C2C2C, 0x333333, 0x1C1C1C, 0x252525, 0xEEEEEE, 0x9E9E9E, 0x6B7280, 0x22C55E, 0xF59E0B,
+    {"Dark Gray", 0x1C1C1C, 0x2C2C2C, 0x333333, 0x1C1C1C, 0x252525, 0xEEEEEE, 0x9E9E9E, 0x6B7280, 0xF97316, 0xF59E0B,
      0xEF4444, true},
     {"Ocean", 0x0B1620, 0x132433, 0x1A3348, 0x0B1620, 0x102030, 0xE2E8F0, 0x94A3B8, 0x0EA5E9, 0x22D3EE, 0xF59E0B,
      0xF43F5E, true},
@@ -125,7 +125,8 @@ lv_obj_t *paxx_create_nav_bar(lv_obj_t *parent, const char *title, lv_event_cb_t
         lv_obj_t *back = lv_btn_create(bar);
         lv_obj_set_size(back, 72, 32);
         lv_obj_align(back, LV_ALIGN_LEFT_MID, 0, 0);
-        lv_obj_set_style_bg_color(back, PaxxTheme::primary(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(back, PaxxTheme::accent(), LV_PART_MAIN);
+        paxx_mark_accent_fill(back);
         lv_obj_add_event_cb(back, backCb, LV_EVENT_CLICKED, userData);
         lv_obj_t *lbl = lv_label_create(back);
         lv_label_set_text(lbl, LV_SYMBOL_LEFT " Back");
@@ -233,6 +234,47 @@ void paxx_set_loading_visible(lv_obj_t *arc, lv_obj_t *label, bool visible, cons
             }
             lv_obj_add_flag(label, LV_OBJ_FLAG_HIDDEN);
         }
+    }
+}
+
+lv_obj_t *paxx_set_centered_icon(lv_obj_t *btn, const char *symbol) {
+    if (!btn) return nullptr;
+    lv_obj_set_style_pad_all(btn, 0, LV_PART_MAIN);
+    lv_obj_set_layout(btn, LV_LAYOUT_NONE);
+    lv_obj_t *icon = lv_label_create(btn);
+    lv_label_set_text(icon, symbol ? symbol : "");
+    lv_obj_set_style_text_font(icon, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_text_align(icon, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_align(icon, LV_ALIGN_CENTER, 0, 0);
+    return icon;
+}
+
+void paxx_mark_accent_fill(lv_obj_t *obj) {
+    if (obj) lv_obj_add_flag(obj, LV_OBJ_FLAG_USER_1);
+}
+
+void paxx_mark_accent_text(lv_obj_t *obj) {
+    if (obj) lv_obj_add_flag(obj, LV_OBJ_FLAG_USER_2);
+}
+
+void paxx_apply_accent_chrome(lv_obj_t *root) {
+    if (!root) return;
+    if (lv_obj_has_flag(root, LV_OBJ_FLAG_USER_1)) {
+        lv_obj_set_style_bg_color(root, PaxxTheme::accent(), LV_PART_MAIN);
+        const uint32_t n = lv_obj_get_child_count(root);
+        for (uint32_t i = 0; i < n; ++i) {
+            lv_obj_t *ch = lv_obj_get_child(root, i);
+            if (ch && !lv_obj_has_flag(ch, LV_OBJ_FLAG_USER_2)) {
+                lv_obj_set_style_text_color(ch, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+            }
+        }
+    }
+    if (lv_obj_has_flag(root, LV_OBJ_FLAG_USER_2)) {
+        lv_obj_set_style_text_color(root, PaxxTheme::accent(), LV_PART_MAIN);
+    }
+    const uint32_t n = lv_obj_get_child_count(root);
+    for (uint32_t i = 0; i < n; ++i) {
+        paxx_apply_accent_chrome(lv_obj_get_child(root, i));
     }
 }
 
