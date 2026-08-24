@@ -69,7 +69,7 @@ The web flasher loads these from `docs/flasher/firmware/` on GitHub Pages.
 
 **Flash fails mid-way (`status 201` or seq failed)**
 
-- Keep **Erase entire flash** checked
+- Choose **Fresh Install**
 - Use a short **data-capable USB-C cable**; avoid hubs if possible
 - K-Touch / PandaTouch use a **CH340 USB chip** — the flasher uses 115200 baud and uncompressed writes (~2–3 min)
 

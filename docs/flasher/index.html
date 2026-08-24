@@ -32,7 +32,7 @@
   <meta name="twitter:image" content="https://techjeeper.github.io/PandaCupboard/flasher/screen1.jpg">
   <meta name="twitter:image:alt" content="PandaCupboard cupboard list on a BIGTREETECH Panda Touch">
 
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -132,12 +132,13 @@
         <div style="text-align:center;margin-top:4px;font-size:0.85rem;color:var(--muted)" id="progressLabel"></div>
       </div>
 
-      <div class="row" style="margin-top:12px;flex-direction:column;align-items:flex-start;gap:8px">
-        <label><input type="checkbox" id="optEraseAll" checked> Erase entire flash before writing (recommended)</label>
-        <p style="color:var(--muted);font-size:0.85rem;margin:0">
-          Uncheck this when upgrading PandaCupboard so WiFi and printer settings are kept.
-          Leave it checked for a first install, or if a previous flash failed.
-        </p>
+      <div class="row install-mode" style="margin-top:12px;flex-direction:column;align-items:flex-start;gap:8px">
+        <label for="optInstallMode">Install mode</label>
+        <select id="optInstallMode">
+          <option value="update" selected>Update</option>
+          <option value="fresh">Fresh Install</option>
+        </select>
+        <p class="install-mode-hint">Update keeps WiFi and printers. Fresh Install erases the chip.</p>
         <p style="color:var(--muted);font-size:0.85rem;margin:0">
           Uses 115200 baud and uncompressed writes for CH340 USB bridges. Takes ~2-3 minutes — keep the cable still.
         </p>

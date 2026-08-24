@@ -252,9 +252,10 @@ async function flashDevice() {
     if (!fileArray.length) throw new Error("No firmware files to flash.");
 
     const flash = state.manifest.flash;
-    const eraseAll = $("optEraseAll")?.checked ?? flash.eraseAll !== false;
+    const eraseAll = $("optInstallMode")?.value === "fresh";
     const compress = flash.compress === true;
-    if (eraseAll) log("Full chip erase enabled (recommended after a failed flash).");
+    if (eraseAll) log("Fresh Install — erasing entire flash.");
+    else log("Update — keeping WiFi and printer settings.");
     if (!compress) log("Uncompressed flash (more reliable over CH340 USB).");
     log("Preserving flash headers embedded in bootloader (PlatformIO build).");
     setStatus("Flashing… do not unplug the USB cable.");
