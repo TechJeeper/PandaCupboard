@@ -56,6 +56,15 @@ void CupboardPreferences::load(AppConfig &out) {
         strlcpy(p.serial, prefs_.getString(key, "").c_str(), sizeof(p.serial));
         snprintf(key, sizeof(key), "p%d_model", i);
         strlcpy(p.model, prefs_.getString(key, "").c_str(), sizeof(p.model));
+        // Missing type key (pre-Klipper firmware) means Bambu Lab.
+        snprintf(key, sizeof(key), "p%d_type", i);
+        uint8_t type = prefs_.getUChar(key, static_cast<uint8_t>(PrinterType::BambuLab));
+        if (type > static_cast<uint8_t>(PrinterType::Klipper)) {
+            type = static_cast<uint8_t>(PrinterType::BambuLab);
+        }
+        p.type = static_cast<PrinterType>(type);
+        snprintf(key, sizeof(key), "p%d_port", i);
+        p.port = prefs_.getUShort(key, 0);
     }
 }
 
@@ -87,6 +96,10 @@ void CupboardPreferences::save(const AppConfig &cfg) {
         prefs_.putString(key, p.serial);
         snprintf(key, sizeof(key), "p%d_model", i);
         prefs_.putString(key, p.model);
+        snprintf(key, sizeof(key), "p%d_type", i);
+        prefs_.putUChar(key, static_cast<uint8_t>(p.type));
+        snprintf(key, sizeof(key), "p%d_port", i);
+        prefs_.putUShort(key, p.port);
     }
 }
 

@@ -2,7 +2,7 @@
 
 Browser-based firmware installer for **BTT K-Touch** and **PandaTouch**, powered by [esptool-js](https://github.com/espressif/esptool-js) and the [Web Serial API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API).
 
-Flashes **PandaFarm** — Bambu Lab farm dashboard.
+Flashes **PandaFarm** — Bambu Lab and Klipper farm dashboard.
 
 ## Live URL
 
@@ -22,10 +22,10 @@ https://pandafarm.techjeeper.com/flasher/
 ## Creating a flashable release
 
 ```powershell
-.\scripts\package-firmware.ps1 -Version "0.2.2"
+.\scripts\package-firmware.ps1 -Version "0.3.0"
 ```
 
-Upload the files from `dist/firmware/` as assets on a GitHub Release tagged `v0.2.2`:
+Upload the files from `dist/firmware/` as assets on a GitHub Release tagged `v0.3.0`:
 
 | Asset | Flash offset |
 |-------|----------------|
@@ -46,7 +46,7 @@ The web flasher loads these from `docs/flasher/firmware/` on GitHub Pages.
 ## After flashing
 
 1. Power on the panel and open **gear → WiFi Setup**
-2. **Gear → Printers** — IP + LAN access code
+2. **Gear → Printers** — pick Bambu Lab or Klipper, then enter connection details
 3. Tap a printer on the farm list for pause / resume / stop
 
 ## Browser support

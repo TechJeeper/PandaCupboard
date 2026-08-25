@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PandaFarm Web Flasher — flash Bambu firmware to Panda Touch</title>
-  <meta name="description" content="Flash PandaFarm v0.2.2 to a BIGTREETECH Panda Touch or K-Touch from Chrome or Edge. Bambu Lab farm dashboard with pause, resume, and stop.">
-  <meta name="keywords" content="PandaFarm, web flasher, Bambu Lab, Panda Touch, K-Touch, BIGTREETECH, ESP32-S3, firmware">
+  <title>PandaFarm Web Flasher — flash Bambu and Klipper firmware to Panda Touch</title>
+  <meta name="description" content="Flash PandaFarm v0.3.0 to a BIGTREETECH Panda Touch or K-Touch from Chrome or Edge. Mixed Bambu Lab and Klipper farm dashboard with pause, resume, and stop.">
+  <meta name="keywords" content="PandaFarm, web flasher, Bambu Lab, Klipper, Moonraker, Panda Touch, K-Touch, BIGTREETECH, ESP32-S3, firmware">
   <meta name="author" content="TechJeeper Designs">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#0f172a">
@@ -20,7 +20,7 @@
   <meta property="og:locale" content="en_US">
   <meta property="og:url" content="https://pandafarm.techjeeper.com/flasher/">
   <meta property="og:title" content="PandaFarm Web Flasher">
-  <meta property="og:description" content="Flash PandaFarm to BTT Panda Touch or K-Touch from the browser. Bambu Lab farm dashboard firmware.">
+  <meta property="og:description" content="Flash PandaFarm to BTT Panda Touch or K-Touch from the browser. Bambu Lab and Klipper farm dashboard firmware.">
   <meta property="og:image" content="https://pandafarm.techjeeper.com/flasher/screen1.jpg">
   <meta property="og:image:alt" content="PandaFarm farm list on a BIGTREETECH Panda Touch">
   <meta property="og:image:width" content="800">
@@ -28,7 +28,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="PandaFarm Web Flasher">
-  <meta name="twitter:description" content="Flash Bambu farm firmware to a Panda Touch or K-Touch in Chrome or Edge.">
+  <meta name="twitter:description" content="Flash Bambu Lab and Klipper farm firmware to a Panda Touch or K-Touch in Chrome or Edge.">
   <meta name="twitter:image" content="https://pandafarm.techjeeper.com/flasher/screen1.jpg">
   <meta name="twitter:image:alt" content="PandaFarm farm list on a BIGTREETECH Panda Touch">
 
@@ -58,7 +58,7 @@
     <header>
       <h1>PandaFarm Web Flasher</h1>
       <p>Flash <strong>PandaFarm</strong> to BTT K-Touch / PandaTouch<br>
-      Bambu Lab farm dashboard in a Studio-style list.</p>
+      Bambu Lab and Klipper farm dashboard in a Studio-style list.</p>
       <p><span class="badge" id="versionBadge">loading…</span></p>
       <p class="header-links">
         <a href="https://github.com/TechJeeper/PandaFarm" target="_blank" rel="noopener">GitHub</a>
@@ -179,9 +179,9 @@
       <ol class="steps">
         <li>Disconnect USB (or tap Reset if the screen stays blank).</li>
         <li>Tap the <strong>gear icon</strong> (top-right) → <strong>WiFi Setup</strong> and connect to your LAN.</li>
-        <li><strong>Gear → Printers</strong> — add a printer (name, IP, LAN access code from the printer’s WLAN settings).</li>
+        <li><strong>Gear → Printers</strong> — add a printer: pick Bambu Lab or Klipper, then enter IP and credentials.</li>
         <li>On the farm list, tap a printer for progress, pause, resume, stop, and reprint.</li>
-        <li>The panel and printers must be on the same LAN. Local MQTT uses port <strong>8883</strong>, user <code>bblp</code>, password = access code.</li>
+        <li>The panel and printers must be on the same LAN. Bambu uses MQTT port <strong>8883</strong> (user <code>bblp</code>, password = access code). Klipper uses Moonraker HTTP on port <strong>7125</strong>.</li>
       </ol>
     </section>
 

@@ -29,6 +29,10 @@ void fillStatus(const PrinterLive &live, const PrinterProfile &profile, char *ou
         snprintf(out, outLen, "Not configured");
         return;
     }
+    if (printerIsBambu(profile) && !profile.accessCode[0]) {
+        snprintf(out, outLen, "Missing access code");
+        return;
+    }
     if (!live.online && live.lastSeenMs == 0) {
         if (live.state == BambuGcodeState::Syncing) snprintf(out, outLen, "syncing");
         else snprintf(out, outLen, "%s", live.lastError[0] ? live.lastError : "Offline");
@@ -536,12 +540,14 @@ void DetailScreen::refresh() {
     lv_label_set_text(tempLbl_, temps);
 
     char meta[160];
-    snprintf(meta, sizeof(meta), "%s   %s   %s%s%s",
-             p.ip, p.serial[0] ? p.serial : "no serial",
-             st.wifi[0] ? st.wifi : "",
-             st.speedPct >= 0 ? "   Speed " : "",
-             "");
-    if (st.speedPct >= 0) {
+    if (printerIsKlipper(p)) {
+        if (st.speedPct >= 0) {
+            snprintf(meta, sizeof(meta), "%s:%u    Klipper    Speed %d%%",
+                     p.ip, printerListenPort(p), st.speedPct);
+        } else {
+            snprintf(meta, sizeof(meta), "%s:%u    Klipper", p.ip, printerListenPort(p));
+        }
+    } else if (st.speedPct >= 0) {
         snprintf(meta, sizeof(meta), "%s    %s    %s    Speed %d%%",
                  p.ip, p.serial[0] ? p.serial : "no serial",
                  st.wifi[0] ? st.wifi : "", st.speedPct);
@@ -593,6 +599,72 @@ void DetailScreen::onEdit(lv_event_t *e) {
     self->app_->editPrinter(self->app_->config().editIndex);
 }
 
+void TypeSelectScreen::create(CupboardApp *app, lv_obj_t *parent) {
+    app_ = app;
+    screen_ = lv_obj_create(parent);
+    lv_obj_set_size(screen_, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_bg_opa(screen_, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(screen_, 0, LV_PART_MAIN);
+    paxx_style_form_screen(screen_);
+    paxx_create_nav_bar(screen_, "Printer Type", farm_back_fleet_cb, app, true);
+
+    lv_obj_t *hint = lv_label_create(screen_);
+    paxx_set_form_width(hint);
+    lv_obj_align(hint, LV_ALIGN_TOP_MID, 0, 64);
+    lv_obj_set_style_text_color(hint, PaxxTheme::muted(), LV_PART_MAIN);
+    lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(hint, "Choose the printer type, then enter connection details.");
+
+    auto addChoice = [&](const char *title, const char *subtitle, PrinterType type, int y) {
+        lv_obj_t *btn = lv_button_create(screen_);
+        paxx_set_form_width(btn);
+        lv_obj_set_height(btn, 96);
+        lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, y);
+        lv_obj_set_layout(btn, LV_LAYOUT_NONE);
+        lv_obj_set_style_bg_color(btn, PaxxTheme::surface(), LV_PART_MAIN);
+        lv_obj_set_style_pad_hor(btn, 24, LV_PART_MAIN);
+        lv_obj_set_style_pad_ver(btn, 16, LV_PART_MAIN);
+        lv_obj_set_user_data(btn, reinterpret_cast<void *>(static_cast<intptr_t>(type)));
+        lv_obj_add_event_cb(btn, onPick, LV_EVENT_CLICKED, this);
+
+        lv_obj_t *t = lv_label_create(btn);
+        lv_label_set_text(t, title);
+        lv_obj_set_style_text_font(t, PaxxTheme::fontTitle(), LV_PART_MAIN);
+        lv_obj_align(t, LV_ALIGN_TOP_LEFT, 0, 4);
+
+        lv_obj_t *s = lv_label_create(btn);
+        lv_label_set_text(s, subtitle);
+        lv_obj_set_style_text_color(s, PaxxTheme::muted(), LV_PART_MAIN);
+        lv_obj_align(s, LV_ALIGN_BOTTOM_LEFT, 0, -4);
+    };
+
+    addChoice("Bambu Lab", "X1, P1, A1, and other Bambu printers  —  IP + LAN access code",
+              PrinterType::BambuLab, 120);
+    addChoice("Klipper", "Moonraker / Mainsail / Fluidd  —  IP + optional API key",
+              PrinterType::Klipper, 232);
+}
+
+void TypeSelectScreen::onEnter() {
+    if (!screen_) return;
+    lv_obj_set_style_bg_color(screen_, PaxxTheme::bg(), LV_PART_MAIN);
+    const uint32_t n = lv_obj_get_child_count(screen_);
+    for (uint32_t i = 0; i < n; ++i) {
+        lv_obj_t *child = lv_obj_get_child(screen_, i);
+        if (lv_obj_check_type(child, &lv_button_class)) {
+            lv_obj_set_style_bg_color(child, PaxxTheme::surface(), LV_PART_MAIN);
+        }
+    }
+}
+
+void TypeSelectScreen::onPick(lv_event_t *e) {
+    auto *self = static_cast<TypeSelectScreen *>(lv_event_get_user_data(e));
+    lv_obj_t *btn = lv_event_get_current_target_obj(e);
+    if (!self || !self->app_ || !btn) return;
+    const auto type = static_cast<PrinterType>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn)));
+    self->app_->addPrinter(type);
+}
+
 void SetupScreen::create(CupboardApp *app, lv_obj_t *parent) {
     app_ = app;
     screen_ = lv_obj_create(parent);
@@ -602,54 +674,98 @@ void SetupScreen::create(CupboardApp *app, lv_obj_t *parent) {
     paxx_style_form_screen(screen_);
     paxx_create_nav_bar(screen_, "Printer Setup", farm_back_fleet_cb, app, true);
 
-    int y = 56;
+    typeLbl_ = lv_label_create(screen_);
+    paxx_set_form_width(typeLbl_);
+    lv_obj_set_style_text_color(typeLbl_, PaxxTheme::muted(), LV_PART_MAIN);
+    lv_obj_set_style_text_align(typeLbl_, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_text(typeLbl_, "Bambu Lab");
+
     auto addField = [&](lv_obj_t **ta, const char *ph, PaxxKbMode mode) {
         *ta = lv_textarea_create(screen_);
         styleTa(*ta);
-        lv_obj_align(*ta, LV_ALIGN_TOP_MID, 0, y);
-        y += 48;
         lv_textarea_set_placeholder_text(*ta, ph);
         PaxxKeyboard::attach(*ta, mode);
     };
 
     addField(&nameTa_, "Printer name (e.g. A1 Mini AMS)", PaxxKbMode::Text);
     addField(&ipTa_, "IP address (e.g. 192.168.1.50)", PaxxKbMode::Number);
+    addField(&portTa_, "Moonraker port (7125)", PaxxKbMode::Number);
     addField(&codeTa_, "LAN access code", PaxxKbMode::Password);
     addField(&serialTa_, "Serial (optional — auto from printer)", PaxxKbMode::Text);
 
     hintLbl_ = lv_label_create(screen_);
     paxx_set_form_width(hintLbl_);
-    lv_obj_align(hintLbl_, LV_ALIGN_TOP_MID, 0, y);
-    y += 28;
     lv_obj_set_style_text_color(hintLbl_, PaxxTheme::muted(), LV_PART_MAIN);
+    lv_label_set_long_mode(hintLbl_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(hintLbl_, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_label_set_text(hintLbl_, "Access code is on the printer under Settings > WLAN. Cloud mode is fine — LAN Only is not required.");
 
-    lv_obj_t *scanBtn = lv_button_create(screen_);
-    paxx_set_form_width(scanBtn);
-    lv_obj_set_height(scanBtn, 40);
-    lv_obj_align(scanBtn, LV_ALIGN_TOP_MID, 0, y);
-    y += 48;
-    lv_obj_add_event_cb(scanBtn, [](lv_event_t *e) {
+    scanBtn_ = lv_button_create(screen_);
+    paxx_set_form_width(scanBtn_);
+    lv_obj_set_height(scanBtn_, 40);
+    lv_obj_add_event_cb(scanBtn_, [](lv_event_t *e) {
         auto *self = static_cast<SetupScreen *>(lv_event_get_user_data(e));
         self->app_->startDiscovery();
         self->refreshDiscoverList();
     }, LV_EVENT_CLICKED, this);
-    lv_label_set_text(lv_label_create(scanBtn), LV_SYMBOL_REFRESH "  Discover on LAN");
+    lv_label_set_text(lv_label_create(scanBtn_), LV_SYMBOL_REFRESH "  Discover on LAN");
 
     discoverList_ = lv_list_create(screen_);
     paxx_set_form_width(discoverList_);
     lv_obj_set_height(discoverList_, 90);
-    lv_obj_align(discoverList_, LV_ALIGN_TOP_MID, 0, y);
-    y += 100;
 
-    lv_obj_t *save = lv_button_create(screen_);
-    paxx_set_form_width(save);
-    lv_obj_set_height(save, 44);
-    lv_obj_align(save, LV_ALIGN_TOP_MID, 0, y);
-    lv_obj_add_event_cb(save, [](lv_event_t *e) {
+    saveBtn_ = lv_button_create(screen_);
+    paxx_set_form_width(saveBtn_);
+    lv_obj_set_height(saveBtn_, 44);
+    lv_obj_add_event_cb(saveBtn_, [](lv_event_t *e) {
         static_cast<CupboardApp *>(lv_event_get_user_data(e))->savePrinterFromSetup();
     }, LV_EVENT_CLICKED, app);
-    lv_label_set_text(lv_label_create(save), "Save printer");
+    lv_label_set_text(lv_label_create(saveBtn_), "Save printer");
+}
+
+void SetupScreen::applyTypeLayout() {
+    if (!app_ || !screen_) return;
+    const AppConfig &cfg = app_->config();
+    const PrinterProfile empty{};
+    const PrinterProfile &p =
+        (cfg.editIndex >= 0 && cfg.editIndex < cfg.printerCount) ? cfg.printers[cfg.editIndex] : empty;
+    const bool klipper = printerIsKlipper(p);
+    int y = 56;
+
+    auto place = [&](lv_obj_t *obj, bool show, int step) {
+        if (!obj) return;
+        if (show) {
+            lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_align(obj, LV_ALIGN_TOP_MID, 0, y);
+            y += step;
+        } else {
+            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        }
+    };
+
+    if (typeLbl_) {
+        lv_label_set_text(typeLbl_, klipper ? "Klipper  —  Moonraker HTTP" : "Bambu Lab  —  LAN MQTT");
+    }
+    if (codeTa_) {
+        lv_textarea_set_placeholder_text(codeTa_, klipper ? "API key (optional)" : "LAN access code");
+    }
+    if (hintLbl_) {
+        lv_label_set_text(hintLbl_,
+                          klipper
+                              ? "Moonraker default port is 7125. API key is optional if this panel is a trusted client."
+                              : "Access code is on the printer under Settings > WLAN. Cloud mode is fine — LAN Only is not required.");
+    }
+
+    place(typeLbl_, true, 28);
+    place(nameTa_, true, 48);
+    place(ipTa_, true, 48);
+    place(portTa_, klipper, 48);
+    place(codeTa_, true, 48);
+    place(serialTa_, !klipper, 48);
+    place(hintLbl_, true, 40);
+    place(scanBtn_, !klipper, 48);
+    place(discoverList_, !klipper, 100);
+    place(saveBtn_, true, 48);
 }
 
 void SetupScreen::loadFromEdit() {
@@ -662,6 +778,16 @@ void SetupScreen::loadFromEdit() {
     if (ipTa_) lv_textarea_set_text(ipTa_, p.ip);
     if (codeTa_) lv_textarea_set_text(codeTa_, p.accessCode);
     if (serialTa_) lv_textarea_set_text(serialTa_, p.serial);
+    if (portTa_) {
+        if (printerIsKlipper(p)) {
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(printerListenPort(p)));
+            lv_textarea_set_text(portTa_, buf);
+        } else {
+            lv_textarea_set_text(portTa_, "");
+        }
+    }
+    applyTypeLayout();
 }
 
 void SetupScreen::applyDiscovery(const DiscoveredPrinter &d) {
@@ -777,7 +903,14 @@ void PrinterManagerScreen::rebuildList() {
         lv_label_set_text(n, p.name[0] ? p.name : "Printer");
         lv_obj_align(n, LV_ALIGN_TOP_LEFT, 0, 4);
         lv_obj_t *h = lv_label_create(info);
-        lv_label_set_text(h, p.ip[0] ? p.ip : "No IP");
+        char sub[64];
+        if (!p.ip[0]) snprintf(sub, sizeof(sub), "%s  No IP", printerTypeLabel(p.type));
+        else if (printerIsKlipper(p)) {
+            snprintf(sub, sizeof(sub), "%s  %s:%u", printerTypeLabel(p.type), p.ip, printerListenPort(p));
+        } else {
+            snprintf(sub, sizeof(sub), "%s  %s", printerTypeLabel(p.type), p.ip);
+        }
+        lv_label_set_text(h, sub);
         lv_obj_set_style_text_color(h, PaxxTheme::muted(), LV_PART_MAIN);
         lv_obj_align(h, LV_ALIGN_BOTTOM_LEFT, 0, -4);
 
@@ -1222,15 +1355,29 @@ void SettingsScreen::create(CupboardApp *app, lv_obj_t *parent) {
     paxx_style_form_screen(screen_);
     paxx_create_nav_bar(screen_, "About", farm_back_fleet_cb, app, true);
 
-    hintLbl_ = lv_label_create(screen_);
+    lv_obj_t *body = lv_obj_create(screen_);
+    lv_obj_set_size(body, LV_PCT(100), 432);
+    lv_obj_align(body, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(body, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_hor(body, 32, LV_PART_MAIN);
+    lv_obj_set_style_pad_ver(body, 12, LV_PART_MAIN);
+    lv_obj_set_scroll_dir(body, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(body, LV_SCROLLBAR_MODE_AUTO);
+
+    hintLbl_ = lv_label_create(body);
     paxx_set_form_width(hintLbl_);
-    lv_obj_align(hintLbl_, LV_ALIGN_TOP_MID, 0, 70);
     lv_label_set_long_mode(hintLbl_, LV_LABEL_LONG_WRAP);
     lv_label_set_text(hintLbl_,
                       "PandaFarm " PANDACUPBOARD_VERSION "\n"
-                      "PandaTouch / K-Touch Bambu Lab farm dashboard.\n\n"
+                      "PandaTouch / K-Touch farm dashboard for Bambu Lab and Klipper.\n\n"
                       "Created by TechJeeper Designs\n\n"
-                      "Connect printers with IP + LAN access code.\n"
-                      "MQTT/TLS 8883 user bblp. SSDP discovery on UDP 1990.\n"
+                      "Latest Changes\n"
+                      "- Klipper printers via Moonraker HTTP\n"
+                      "- Choose Bambu Lab or Klipper before setup\n"
+                      "- Existing printers stay Bambu Lab after upgrade\n"
+                      "- Pause, resume, stop, and reprint on Klipper jobs\n\n"
+                      "Bambu Lab: IP + LAN access code, MQTT/TLS 8883, SSDP on UDP 1990.\n"
+                      "Klipper: Moonraker HTTP (port 7125) with optional API key.\n"
                       "Farm sorts by Device Status; active jobs with higher completion stay on top.");
 }

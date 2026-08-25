@@ -1,4 +1,5 @@
 #include "bambu/BambuFleet.h"
+#include "klipper/KlipperFleet.h"
 
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -209,7 +210,24 @@ void BambuFleet::disconnectMqtt() {
 
 bool BambuFleet::printerReady(int index) const {
     if (!cfg_ || index < 0 || index >= cfg_->printerCount) return false;
-    return cfg_->printers[index].ip[0] && cfg_->printers[index].accessCode[0];
+    const PrinterProfile &p = cfg_->printers[index];
+    return printerIsBambu(p) && p.ip[0] && p.accessCode[0];
+}
+
+bool BambuFleet::hasReadyPrinter() const {
+    const int n = count();
+    for (int i = 0; i < n; ++i) {
+        if (printerReady(i)) return true;
+    }
+    return false;
+}
+
+void BambuFleet::applyExternalLive(int index, const PrinterLive &live) {
+    if (index < 0 || index >= BAMBU_MAX_PRINTERS) return;
+    if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
+        live_[index] = live;
+        xSemaphoreGive(lock_);
+    }
 }
 
 bool BambuFleet::inBackoff(int index) const {
@@ -409,6 +427,9 @@ void BambuFleet::setFocus(int index) {
 
 bool BambuFleet::sendPrintCommand(int index, const char *command) {
     if (index < 0 || index >= count() || !command || !command[0]) return false;
+    if (cfg_ && printerIsKlipper(cfg_->printers[index])) {
+        return KlipperFleet::instance().sendPrintCommand(index, command);
+    }
     pendingIndex_ = index;
     strlcpy(pendingCmd_, command, sizeof(pendingCmd_));
     pendingParam_[0] = '\0';
@@ -424,6 +445,9 @@ bool BambuFleet::sendPrintCommand(int index, const char *command) {
 
 bool BambuFleet::reprintLast(int index) {
     if (index < 0 || index >= count()) return false;
+    if (cfg_ && printerIsKlipper(cfg_->printers[index])) {
+        return KlipperFleet::instance().reprintLast(index);
+    }
     char file[80] = {};
     if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
         strlcpy(file, live_[index].gcodeFile, sizeof(file));
@@ -613,7 +637,8 @@ void BambuFleet::taskLoop() {
     for (;;) {
         persistPendingSerial();
 
-        if (focusIndex_ >= 0 && focusIndex_ < count() && pollIndex_ != focusIndex_) {
+        if (focusIndex_ >= 0 && focusIndex_ < count() && pollIndex_ != focusIndex_ &&
+            printerReady(focusIndex_)) {
             disconnectMqtt();
             pollIndex_ = focusIndex_;
         }
@@ -627,7 +652,7 @@ void BambuFleet::taskLoop() {
             if (!keepSession) disconnectMqtt();
         }
 
-        if (!cfg_ || count() <= 0 || !wifiReady()) {
+        if (!cfg_ || count() <= 0 || !wifiReady() || !hasReadyPrinter()) {
             if (sessionOpen_) disconnectMqtt();
             wifiReadyMs_ = 0;
             vTaskDelay(pdMS_TO_TICKS(400));

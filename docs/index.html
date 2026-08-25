@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PandaFarm — Bambu Lab dashboard for Panda Touch / K-Touch</title>
-  <meta name="description" content="PandaFarm is custom firmware for BIGTREETECH Panda Touch and K-Touch. Monitor a Bambu Lab farm from a Studio-style list, then flash it in Chrome or Edge.">
-  <meta name="keywords" content="PandaFarm, Bambu Lab, Panda Touch, K-Touch, BIGTREETECH, firmware, web flasher, 3D printer farm, MQTT">
+  <title>PandaFarm — Bambu Lab and Klipper dashboard for Panda Touch / K-Touch</title>
+  <meta name="description" content="PandaFarm is custom firmware for BIGTREETECH Panda Touch and K-Touch. Monitor a mixed Bambu Lab and Klipper farm from a Studio-style list, then flash it in Chrome or Edge.">
+  <meta name="keywords" content="PandaFarm, Bambu Lab, Klipper, Moonraker, Panda Touch, K-Touch, BIGTREETECH, firmware, web flasher, 3D printer farm, MQTT">
   <meta name="author" content="TechJeeper Designs">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#0f172a">
@@ -19,16 +19,16 @@
   <meta property="og:site_name" content="PandaFarm">
   <meta property="og:locale" content="en_US">
   <meta property="og:url" content="https://pandafarm.techjeeper.com/">
-  <meta property="og:title" content="PandaFarm — Bambu Lab dashboard for Panda Touch">
-  <meta property="og:description" content="Custom firmware for BTT Panda Touch / K-Touch: a Studio-style Bambu farm list with pause, resume, and stop. Flash from the browser.">
+  <meta property="og:title" content="PandaFarm — Bambu Lab and Klipper dashboard for Panda Touch">
+  <meta property="og:description" content="Custom firmware for BTT Panda Touch / K-Touch: a Studio-style farm list for Bambu Lab and Klipper, with pause, resume, and stop. Flash from the browser.">
   <meta property="og:image" content="https://pandafarm.techjeeper.com/flasher/screen1.jpg">
   <meta property="og:image:alt" content="PandaFarm farm list on a BIGTREETECH Panda Touch">
   <meta property="og:image:width" content="800">
   <meta property="og:image:height" content="480">
 
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PandaFarm — Bambu Lab dashboard for Panda Touch">
-  <meta name="twitter:description" content="Custom firmware for BTT Panda Touch / K-Touch. Flash from Chrome or Edge.">
+  <meta name="twitter:title" content="PandaFarm — Bambu Lab and Klipper dashboard for Panda Touch">
+  <meta name="twitter:description" content="Custom firmware for BTT Panda Touch / K-Touch. Mix Bambu Lab and Klipper. Flash from Chrome or Edge.">
   <meta name="twitter:image" content="https://pandafarm.techjeeper.com/flasher/screen1.jpg">
   <meta name="twitter:image:alt" content="PandaFarm farm list on a BIGTREETECH Panda Touch">
 
@@ -40,7 +40,7 @@
     "name": "PandaFarm",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "BIGTREETECH Panda Touch, BIGTREETECH K-Touch",
-    "softwareVersion": "0.2.2",
+    "softwareVersion": "0.3.0",
     "url": "https://pandafarm.techjeeper.com/",
     "downloadUrl": "https://pandafarm.techjeeper.com/flasher/",
     "image": "https://pandafarm.techjeeper.com/flasher/screen1.jpg",
@@ -48,7 +48,7 @@
       "https://pandafarm.techjeeper.com/flasher/screen1.jpg",
       "https://pandafarm.techjeeper.com/flasher/screen2.jpg"
     ],
-    "description": "Custom firmware for BIGTREETECH Panda Touch and K-Touch that shows a Bambu Lab farm dashboard.",
+    "description": "Custom firmware for BIGTREETECH Panda Touch and K-Touch that shows a mixed Bambu Lab and Klipper farm dashboard.",
     "author": {
       "@type": "Organization",
       "name": "TechJeeper Designs",
@@ -69,7 +69,7 @@
     <header>
       <h1>PandaFarm</h1>
       <p>Custom firmware for <strong>BTT Panda Touch / K-Touch</strong><br>
-      A Bambu Lab farm dashboard in a Studio-style list.</p>
+      A mixed Bambu Lab and Klipper farm dashboard in a Studio-style list.</p>
       <p class="header-links">
         <a href="flasher/">Web Flasher</a>
         ·
@@ -108,6 +108,18 @@
           <figcaption>Printer detail</figcaption>
         </figure>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>v0.3.0 — Bambu Lab and Klipper</h2>
+      <p style="color:var(--muted);margin:0 0 12px">
+        One farm list for both printer types. Add a printer, pick <strong>Bambu Lab</strong> or <strong>Klipper</strong>, then enter connection details.
+        Printers saved on older firmware stay Bambu Lab after you update.
+      </p>
+      <ul class="steps">
+        <li><strong>Bambu Lab</strong> — IP + LAN access code. MQTT/TLS on port 8883. SSDP discovery on the LAN.</li>
+        <li><strong>Klipper</strong> — Moonraker HTTP on port 7125, optional API key. Pause, resume, stop, and reprint.</li>
+      </ul>
     </section>
 
     <section class="card">

@@ -1,5 +1,6 @@
 #include "ui/App.h"
 
+#include "klipper/KlipperFleet.h"
 #include "pt/pt_display.h"
 #include "ui/Keyboard.h"
 #include "ui/Notify.h"
@@ -7,6 +8,7 @@
 
 #include <WiFi.h>
 #include <esp_system.h>
+#include <cstdlib>
 #include <cstring>
 
 void CupboardApp::begin() {
@@ -18,6 +20,7 @@ void CupboardApp::begin() {
     buildShell();
     PaxxNotify::init(shell_);
     BambuFleet::instance().begin(&config_, &discovery_);
+    KlipperFleet::instance().begin(&config_);
 
     wifi_.setStatusCallback([this](bool connected, const char *message) {
         if (activeScreen_ == wifiScreen_.root()) {
@@ -32,7 +35,7 @@ void CupboardApp::begin() {
             if (CupboardPreferences::instance().hasPrinter() && activeScreen_ == wifiScreen_.root()) {
                 showFleet();
             } else if (!CupboardPreferences::instance().hasPrinter() && activeScreen_ == wifiScreen_.root()) {
-                showSetup();
+                showPrinterType();
             }
         } else if (!wifi_.isConnectPending()) {
             wifiLostAtMs_ = millis();
@@ -46,7 +49,7 @@ void CupboardApp::begin() {
     if (!CupboardPreferences::instance().hasWifi()) {
         showWifi();
     } else if (!CupboardPreferences::instance().hasPrinter()) {
-        showSetup();
+        showPrinterType();
     } else {
         showFleet();
     }
@@ -108,13 +111,24 @@ bool CupboardApp::addPrinter() {
         PaxxNotify::show("Printers", "Maximum printers reached");
         return false;
     }
+    showPrinterType();
+    return true;
+}
+
+bool CupboardApp::addPrinter(PrinterType type) {
+    if (config_.printerCount >= BAMBU_MAX_PRINTERS) {
+        PaxxNotify::show("Printers", "Maximum printers reached");
+        return false;
+    }
     PrinterProfile &p = config_.printers[config_.printerCount];
     memset(&p, 0, sizeof(p));
+    p.type = type;
     snprintf(p.name, sizeof(p.name), "Printer %d", config_.printerCount + 1);
     config_.editIndex = config_.printerCount;
     config_.printerCount += 1;
     saveConfig();
     BambuFleet::instance().reload();
+    KlipperFleet::instance().reload();
     editPrinter(config_.editIndex);
     return true;
 }
@@ -131,6 +145,7 @@ bool CupboardApp::removePrinter(int index) {
     }
     saveConfig();
     BambuFleet::instance().forgetPrinter(index);
+    KlipperFleet::instance().forgetPrinter(index);
     return true;
 }
 
@@ -151,10 +166,19 @@ void CupboardApp::savePrinterFromSetup() {
     strlcpy(p.name, lv_textarea_get_text(setup_.nameInput()), sizeof(p.name));
     strlcpy(p.ip, lv_textarea_get_text(setup_.ipInput()), sizeof(p.ip));
     strlcpy(p.accessCode, lv_textarea_get_text(setup_.codeInput()), sizeof(p.accessCode));
-    strlcpy(p.serial, lv_textarea_get_text(setup_.serialInput()), sizeof(p.serial));
-    if (!p.name[0]) strlcpy(p.name, p.ip[0] ? p.ip : "Bambu", sizeof(p.name));
+    if (printerIsKlipper(p)) {
+        const char *portText = lv_textarea_get_text(setup_.portInput());
+        const int port = portText && portText[0] ? atoi(portText) : 0;
+        p.port = (port > 0 && port <= 65535) ? static_cast<uint16_t>(port) : 0;
+        p.serial[0] = '\0';
+    } else {
+        strlcpy(p.serial, lv_textarea_get_text(setup_.serialInput()), sizeof(p.serial));
+        p.port = 0;
+    }
+    if (!p.name[0]) strlcpy(p.name, p.ip[0] ? p.ip : printerTypeLabel(p.type), sizeof(p.name));
     saveConfig();
     BambuFleet::instance().reload();
+    KlipperFleet::instance().reload();
     PaxxNotify::show("Printer", "Saved");
     showFleet();
 }
@@ -170,6 +194,7 @@ void CupboardApp::mergeDiscoveredPrinters() {
     for (const auto &d : discovery_.results()) {
         for (int i = 0; i < config_.printerCount; ++i) {
             PrinterProfile &p = config_.printers[i];
+            if (printerIsKlipper(p)) continue;
             const bool serialHit = d.serial[0] && p.serial[0] && strcmp(d.serial, p.serial) == 0;
             const bool ipHit = d.ip[0] && p.ip[0] && strcmp(d.ip, p.ip) == 0;
             if (!serialHit && !ipHit) continue;
@@ -201,6 +226,7 @@ void CupboardApp::loop() {
     discovery_.loop();
     mergeDiscoveredPrinters();
     BambuFleet::instance().loop();
+    KlipperFleet::instance().loop();
     PaxxNotify::loop();
 
     if (wifiLostAtMs_ != 0 && !WiFi.isConnected() && millis() - wifiLostAtMs_ > 5000) {
@@ -358,6 +384,7 @@ void CupboardApp::buildShell() {
 
     fleet_.create(this, content_);
     detail_.create(this, content_);
+    typeSelect_.create(this, content_);
     setup_.create(this, content_);
     printerManager_.create(this, content_);
     wifiScreen_.create(this, content_);
@@ -411,6 +438,7 @@ void CupboardApp::presentScreen(lv_obj_t *screen, const char *tickKind) {
 
     lv_obj_add_flag(fleet_.root(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(detail_.root(), LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(typeSelect_.root(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(setup_.root(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(printerManager_.root(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(wifiScreen_.root(), LV_OBJ_FLAG_HIDDEN);
@@ -424,6 +452,7 @@ void CupboardApp::presentScreen(lv_obj_t *screen, const char *tickKind) {
 
     if (screen == fleet_.root()) fleet_.onEnter();
     else if (screen == detail_.root()) detail_.onEnter();
+    else if (screen == typeSelect_.root()) typeSelect_.onEnter();
     else if (screen == setup_.root()) setup_.onEnter();
     else if (screen == printerManager_.root()) printerManager_.onEnter();
     else if (screen == wifiScreen_.root()) wifiScreen_.onEnter();
@@ -444,6 +473,7 @@ void CupboardApp::showPrinter(int index) {
     BambuFleet::instance().setFocus(index);
     showScreen(detail_.root(), "detail");
 }
+void CupboardApp::showPrinterType() { showScreen(typeSelect_.root()); }
 void CupboardApp::showSetup() { showScreen(setup_.root()); }
 void CupboardApp::showPrinterManager() { showScreen(printerManager_.root()); }
 void CupboardApp::showWifi() { showScreen(wifiScreen_.root()); }

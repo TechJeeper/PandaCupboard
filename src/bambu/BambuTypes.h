@@ -19,13 +19,29 @@ enum class BambuGcodeState : uint8_t {
 
 enum class FleetSort : uint8_t { DeviceStatus = 0, DeviceName = 1 };
 
+enum class PrinterType : uint8_t { BambuLab = 0, Klipper = 1 };
+
 struct PrinterProfile {
     char name[32];
     char ip[16];
-    char accessCode[24];
+    char accessCode[64];
     char serial[32];
     char model[16];
+    PrinterType type = PrinterType::BambuLab;
+    uint16_t port = 0;
 };
+
+inline bool printerIsKlipper(const PrinterProfile &p) { return p.type == PrinterType::Klipper; }
+inline bool printerIsBambu(const PrinterProfile &p) { return p.type != PrinterType::Klipper; }
+
+inline uint16_t printerListenPort(const PrinterProfile &p) {
+    if (p.port) return p.port;
+    return printerIsKlipper(p) ? KLIPPER_MOONRAKER_PORT : BAMBU_MQTT_PORT;
+}
+
+inline const char *printerTypeLabel(PrinterType type) {
+    return type == PrinterType::Klipper ? "Klipper" : "Bambu Lab";
+}
 
 struct PrinterLive {
     BambuGcodeState state = BambuGcodeState::Offline;

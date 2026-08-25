@@ -27,6 +27,7 @@ public:
     int focus() const { return focusIndex_; }
     bool sendPrintCommand(int index, const char *command);
     bool reprintLast(int index);
+    void applyExternalLive(int index, const PrinterLive &live);
 
 private:
     BambuFleet() = default;
@@ -48,6 +49,7 @@ private:
     bool connectMqtt(const char *ipStr, const char *accessCode, const char *name);
     int nextConfigured(int from) const;
     bool printerReady(int index) const;
+    bool hasReadyPrinter() const;
     bool inBackoff(int index) const;
     void noteConnectResult(int index, bool ok);
 

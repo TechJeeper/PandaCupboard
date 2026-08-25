@@ -70,6 +70,19 @@ private:
     uint32_t lastUiMs_ = 0;
 };
 
+class TypeSelectScreen {
+public:
+    void create(CupboardApp *app, lv_obj_t *parent);
+    void onEnter();
+    lv_obj_t *root() const { return screen_; }
+
+private:
+    static void onPick(lv_event_t *e);
+
+    CupboardApp *app_ = nullptr;
+    lv_obj_t *screen_ = nullptr;
+};
+
 class SetupScreen {
 public:
     void create(CupboardApp *app, lv_obj_t *parent);
@@ -78,21 +91,27 @@ public:
     lv_obj_t *root() const { return screen_; }
     lv_obj_t *nameInput() const { return nameTa_; }
     lv_obj_t *ipInput() const { return ipTa_; }
+    lv_obj_t *portInput() const { return portTa_; }
     lv_obj_t *codeInput() const { return codeTa_; }
     lv_obj_t *serialInput() const { return serialTa_; }
 
     void applyDiscovery(const DiscoveredPrinter &d);
     void refreshDiscoverList();
+    void applyTypeLayout();
 
 private:
     CupboardApp *app_ = nullptr;
     lv_obj_t *screen_ = nullptr;
     lv_obj_t *nameTa_ = nullptr;
     lv_obj_t *ipTa_ = nullptr;
+    lv_obj_t *portTa_ = nullptr;
     lv_obj_t *codeTa_ = nullptr;
     lv_obj_t *serialTa_ = nullptr;
+    lv_obj_t *typeLbl_ = nullptr;
     lv_obj_t *hintLbl_ = nullptr;
+    lv_obj_t *scanBtn_ = nullptr;
     lv_obj_t *discoverList_ = nullptr;
+    lv_obj_t *saveBtn_ = nullptr;
 };
 
 class PrinterManagerScreen {
@@ -210,6 +229,7 @@ public:
     void setAppearance(UiTheme theme, UiTextSize textSize);
     void applyDisplaySettings(uint8_t brightness, uint16_t dimSec, uint16_t sleepSec, bool save);
     bool addPrinter();
+    bool addPrinter(PrinterType type);
     bool removePrinter(int index);
     void editPrinter(int index);
     void savePrinterFromSetup();
@@ -218,6 +238,7 @@ public:
 
     void showFleet();
     void showPrinter(int index);
+    void showPrinterType();
     void showSetup();
     void showPrinterManager();
     void showWifi();
@@ -228,6 +249,7 @@ public:
     void refreshDisplay();
 
     SetupScreen &setup() { return setup_; }
+    TypeSelectScreen &typeSelect() { return typeSelect_; }
     PrinterManagerScreen &printerManager() { return printerManager_; }
     WifiScreen &wifiScreen() { return wifiScreen_; }
     ThemeScreen &themeScreen() { return themeScreen_; }
@@ -265,6 +287,7 @@ private:
 
     FleetScreen fleet_;
     DetailScreen detail_;
+    TypeSelectScreen typeSelect_;
     SetupScreen setup_;
     PrinterManagerScreen printerManager_;
     WifiScreen wifiScreen_;
