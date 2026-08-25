@@ -131,8 +131,8 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_set_style_text_color(titleLbl_, PaxxTheme::accent(), LV_PART_MAIN);
 
     lv_obj_t *addBtn = lv_button_create(titleBar_);
-    lv_obj_set_size(addBtn, 48, 36);
-    lv_obj_align(addBtn, LV_ALIGN_RIGHT_MID, -48, 0);
+    lv_obj_set_size(addBtn, 40, 40);
+    lv_obj_align(addBtn, LV_ALIGN_RIGHT_MID, -56, 0);
     lv_obj_add_event_cb(addBtn, [](lv_event_t *e) {
         static_cast<CupboardApp *>(lv_event_get_user_data(e))->addPrinter();
     }, LV_EVENT_CLICKED, app);

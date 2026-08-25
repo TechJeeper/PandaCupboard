@@ -290,7 +290,7 @@ void CupboardApp::toggleGearMenu() {
 void CupboardApp::buildGearMenu() {
     gearBtn_ = lv_button_create(shell_);
     lv_obj_set_size(gearBtn_, 40, 40);
-    lv_obj_align(gearBtn_, LV_ALIGN_TOP_RIGHT, -8, 6);
+    lv_obj_align(gearBtn_, LV_ALIGN_TOP_RIGHT, -8, 4);
     lv_obj_set_style_bg_color(gearBtn_, PaxxTheme::accent(), LV_PART_MAIN);
     paxx_mark_accent_fill(gearBtn_);
     lv_obj_add_event_cb(gearBtn_, [](lv_event_t *e) {
