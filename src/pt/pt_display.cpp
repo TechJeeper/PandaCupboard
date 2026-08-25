@@ -1,4 +1,5 @@
 #include "pt/pt_display.h"
+#include "cupboard/BuildConfig.h"
 
 #include <cstring>
 
@@ -80,8 +81,8 @@ void pt_display_resync_and_redraw() {
 
 namespace {
 constexpr uint8_t kDimPercent = 10;
-constexpr uint16_t kDimMaxSec = 600;
-constexpr uint16_t kSleepMaxSec = 1800;
+constexpr uint16_t kDimMaxSec = DISPLAY_TIMEOUT_MAX_SEC;
+constexpr uint16_t kSleepMaxSec = DISPLAY_TIMEOUT_MAX_SEC;
 
 uint8_t gUserBrightness = 100;
 uint16_t gDimSec = 0;

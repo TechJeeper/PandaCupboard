@@ -34,9 +34,9 @@ void CupboardPreferences::load(AppConfig &out) {
     if (out.brightness < 1) out.brightness = 1;
     if (out.brightness > 100) out.brightness = 100;
     out.dimSec = prefs_.getUShort("dim", 0);
-    if (out.dimSec > 600) out.dimSec = 600;
+    if (out.dimSec > DISPLAY_TIMEOUT_MAX_SEC) out.dimSec = DISPLAY_TIMEOUT_MAX_SEC;
     out.sleepSec = prefs_.getUShort("sleep", 0);
-    if (out.sleepSec > 1800) out.sleepSec = 1800;
+    if (out.sleepSec > DISPLAY_TIMEOUT_MAX_SEC) out.sleepSec = DISPLAY_TIMEOUT_MAX_SEC;
     out.fleetSort = static_cast<FleetSort>(prefs_.getUChar("sort", static_cast<uint8_t>(FleetSort::DeviceStatus)));
 
     if (out.printerCount < 0) out.printerCount = 0;

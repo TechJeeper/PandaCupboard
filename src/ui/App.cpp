@@ -85,8 +85,8 @@ void CupboardApp::applyAppearance() {
 void CupboardApp::applyDisplaySettings(uint8_t brightness, uint16_t dimSec, uint16_t sleepSec, bool save) {
     if (brightness < 1) brightness = 1;
     if (brightness > 100) brightness = 100;
-    if (dimSec > 600) dimSec = 600;
-    if (sleepSec > 1800) sleepSec = 1800;
+    if (dimSec > DISPLAY_TIMEOUT_MAX_SEC) dimSec = DISPLAY_TIMEOUT_MAX_SEC;
+    if (sleepSec > DISPLAY_TIMEOUT_MAX_SEC) sleepSec = DISPLAY_TIMEOUT_MAX_SEC;
     config_.brightness = brightness;
     config_.dimSec = dimSec;
     config_.sleepSec = sleepSec;

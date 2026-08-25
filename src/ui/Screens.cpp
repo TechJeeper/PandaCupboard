@@ -81,12 +81,18 @@ void formatTimeout(uint16_t sec, char *buf, size_t n) {
         snprintf(buf, n, "Never");
         return;
     }
+    const unsigned h = static_cast<unsigned>(sec) / 3600;
+    const unsigned m = (static_cast<unsigned>(sec) % 3600) / 60;
+    const unsigned s = static_cast<unsigned>(sec) % 60;
+    if (h > 0) {
+        if (m == 0) snprintf(buf, n, "%u hr", h);
+        else snprintf(buf, n, "%u hr %u min", h, m);
+        return;
+    }
     if (sec < 60) {
         snprintf(buf, n, "%u sec", static_cast<unsigned>(sec));
         return;
     }
-    const unsigned m = sec / 60;
-    const unsigned s = sec % 60;
     if (s == 0) snprintf(buf, n, "%u min", m);
     else snprintf(buf, n, "%u min %u sec", m, s);
 }
@@ -1127,16 +1133,16 @@ void DisplayScreen::create(CupboardApp *app, lv_obj_t *parent) {
     };
 
     makeRow("Brightness", "Live backlight level", 64, &brightSlider_, &brightVal_, 1, 100, 0);
-    makeRow("Dim Time", "Dim to 10% after idle. 0 = do not dim", 160, &dimSlider_, &dimVal_, 0, 600, 1);
-    makeRow("Sleep Time", "Turn off after idle. 0 = keep display on", 270, &sleepSlider_, &sleepVal_, 0, 1800, 2);
+    makeRow("Dim Time", "Dim to 10% after idle. 0 = do not dim", 160, &dimSlider_, &dimVal_, 0, DISPLAY_TIMEOUT_MAX_MIN, 1);
+    makeRow("Sleep Time", "Turn off after idle. 0 = keep display on", 270, &sleepSlider_, &sleepVal_, 0, DISPLAY_TIMEOUT_MAX_MIN, 2);
 }
 
 void DisplayScreen::onEnter() {
     if (!app_ || !brightSlider_) return;
     loading_ = true;
     lv_slider_set_value(brightSlider_, app_->config().brightness, LV_ANIM_OFF);
-    lv_slider_set_value(dimSlider_, app_->config().dimSec, LV_ANIM_OFF);
-    lv_slider_set_value(sleepSlider_, app_->config().sleepSec, LV_ANIM_OFF);
+    lv_slider_set_value(dimSlider_, app_->config().dimSec / 60, LV_ANIM_OFF);
+    lv_slider_set_value(sleepSlider_, app_->config().sleepSec / 60, LV_ANIM_OFF);
     loading_ = false;
     updateLabels();
     refresh();
@@ -1150,12 +1156,12 @@ void DisplayScreen::updateLabels() {
     }
     if (dimVal_ && dimSlider_) {
         char buf[24];
-        formatTimeout(static_cast<uint16_t>(lv_slider_get_value(dimSlider_)), buf, sizeof(buf));
+        formatTimeout(static_cast<uint16_t>(lv_slider_get_value(dimSlider_) * 60), buf, sizeof(buf));
         lv_label_set_text(dimVal_, buf);
     }
     if (sleepVal_ && sleepSlider_) {
         char buf[24];
-        formatTimeout(static_cast<uint16_t>(lv_slider_get_value(sleepSlider_)), buf, sizeof(buf));
+        formatTimeout(static_cast<uint16_t>(lv_slider_get_value(sleepSlider_) * 60), buf, sizeof(buf));
         lv_label_set_text(sleepVal_, buf);
     }
 }
@@ -1163,8 +1169,8 @@ void DisplayScreen::updateLabels() {
 void DisplayScreen::applyFromSliders(bool save) {
     if (!app_ || !brightSlider_ || !dimSlider_ || !sleepSlider_) return;
     app_->applyDisplaySettings(static_cast<uint8_t>(lv_slider_get_value(brightSlider_)),
-                               static_cast<uint16_t>(lv_slider_get_value(dimSlider_)),
-                               static_cast<uint16_t>(lv_slider_get_value(sleepSlider_)),
+                               static_cast<uint16_t>(lv_slider_get_value(dimSlider_) * 60),
+                               static_cast<uint16_t>(lv_slider_get_value(sleepSlider_) * 60),
                                save);
     updateLabels();
 }
