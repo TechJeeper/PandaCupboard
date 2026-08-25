@@ -1,6 +1,7 @@
 #include "ui/App.h"
 
 #include "pt/pt_display.h"
+#include "ui/FleetList.h"
 #include "ui/Keyboard.h"
 #include "ui/Notify.h"
 #include "ui/Theme.h"
@@ -179,20 +180,23 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_set_flex_flow(list_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_scroll_dir(list_, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(list_, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_scroll_snap_y(list_, LV_SCROLL_SNAP_NONE);
+    lv_obj_remove_flag(list_, LV_OBJ_FLAG_SCROLL_ELASTIC);
+    lv_obj_add_flag(list_, LV_OBJ_FLAG_SCROLL_MOMENTUM);
 }
 
 void FleetScreen::onSortName(lv_event_t *e) {
     auto *self = static_cast<FleetScreen *>(lv_event_get_user_data(e));
     self->app_->config().fleetSort = FleetSort::DeviceName;
     self->app_->saveConfig();
-    self->rebuild();
+    self->rebuild(true);
 }
 
 void FleetScreen::onSortStatus(lv_event_t *e) {
     auto *self = static_cast<FleetScreen *>(lv_event_get_user_data(e));
     self->app_->config().fleetSort = FleetSort::DeviceStatus;
     self->app_->saveConfig();
-    self->rebuild();
+    self->rebuild(true);
 }
 
 void FleetScreen::onEnter() {
@@ -216,46 +220,60 @@ void FleetScreen::onEnter() {
         }
     }
     if (list_) lv_obj_set_style_bg_color(list_, PaxxTheme::row(), LV_PART_MAIN);
-    rebuild();
+    rebuild(true);
 }
+
+namespace {
+bool fleetListGestureActive(const lv_obj_t *list) {
+    if (!list) return false;
+    if (lv_obj_is_scrolling(list)) return true;
+    lv_indev_t *indev = nullptr;
+    while ((indev = lv_indev_get_next(indev)) != nullptr) {
+        if (lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) continue;
+        if (lv_indev_get_state(indev) != LV_INDEV_STATE_PRESSED) continue;
+        if (lv_indev_get_scroll_obj(indev) == list) return true;
+        lv_point_t p;
+        lv_indev_get_point(indev, &p);
+        if (lv_indev_search_obj(const_cast<lv_obj_t *>(list), &p)) return true;
+    }
+    return false;
+}
+
+void fleetShowEmpty(lv_obj_t *list) {
+    lv_obj_t *empty = lv_label_create(list);
+    lv_label_set_text(empty, "No printers yet. Tap + or Gear -> Printers.\nDiscover on the LAN from printer setup.");
+    lv_obj_set_style_text_color(empty, PaxxTheme::muted(), LV_PART_MAIN);
+    lv_obj_set_style_pad_all(empty, 24, LV_PART_MAIN);
+}
+}  // namespace
 
 void FleetScreen::onTick() {
+    if (fleetListGestureActive(list_)) return;
     if (millis() - lastUiMs_ < 800) return;
     lastUiMs_ = millis();
-    rebuild();
+    rebuild(false);
 }
 
-void FleetScreen::rebuild() {
-    if (!list_ || !app_) return;
-    lv_obj_clean(list_);
+void FleetScreen::paintRow(lv_obj_t *row, int printerIndex, int visualIndex, bool createWidgets) {
+    const PrinterProfile &p = profiles_[printerIndex];
+    const PrinterLive &st = live_[printerIndex];
+    lv_obj_set_user_data(row, reinterpret_cast<void *>(static_cast<intptr_t>(printerIndex)));
+    lv_obj_set_style_bg_color(row, (visualIndex % 2) ? PaxxTheme::rowAlt() : PaxxTheme::row(), LV_PART_MAIN);
 
-    int count = 0;
-    int n = 0;
-    BambuFleet::instance().snapshot(profiles_, live_, &count);
-    BambuFleet::instance().sortedIndexes(order_, &n, app_->config().fleetSort);
-    if (n > count) n = count;
+    lv_obj_t *name = nullptr;
+    lv_obj_t *task = nullptr;
+    lv_obj_t *statusBox = nullptr;
+    lv_obj_t *stLbl = nullptr;
+    lv_obj_t *bar = nullptr;
 
-    if (n == 0) {
-        lv_obj_t *empty = lv_label_create(list_);
-        lv_label_set_text(empty, "No printers yet. Tap + or Gear -> Printers.\nDiscover on the LAN from printer setup.");
-        lv_obj_set_style_text_color(empty, PaxxTheme::muted(), LV_PART_MAIN);
-        lv_obj_set_style_pad_all(empty, 24, LV_PART_MAIN);
-        return;
-    }
-
-    for (int r = 0; r < n; ++r) {
-        const int i = order_[r];
-        const PrinterProfile &p = profiles_[i];
-        const PrinterLive &st = live_[i];
-
-        lv_obj_t *row = lv_button_create(list_);
+    if (createWidgets) {
         lv_obj_set_size(row, LV_PCT(100), PaxxTheme::rowHeight());
-        lv_obj_set_style_bg_color(row, (r % 2) ? PaxxTheme::rowAlt() : PaxxTheme::row(), LV_PART_MAIN);
         lv_obj_set_style_radius(row, 0, LV_PART_MAIN);
         lv_obj_set_style_shadow_width(row, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_hor(row, 12, LV_PART_MAIN);
-        lv_obj_set_user_data(row, reinterpret_cast<void *>(static_cast<intptr_t>(i)));
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLL_ELASTIC);
         lv_obj_add_event_cb(row, [](lv_event_t *e) {
             auto *app = static_cast<CupboardApp *>(lv_event_get_user_data(e));
             auto *tgt = static_cast<lv_obj_t *>(lv_event_get_target(e));
@@ -263,31 +281,17 @@ void FleetScreen::rebuild() {
             app->showPrinter(idx);
         }, LV_EVENT_CLICKED, app_);
 
-        lv_obj_t *name = lv_label_create(row);
-        lv_label_set_text(name, p.name[0] ? p.name : "Printer");
+        name = lv_label_create(row);
         lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-        lv_obj_set_style_text_font(name, PaxxTheme::fontBody(), LV_PART_MAIN);
-        lv_obj_set_style_text_color(name, PaxxTheme::text(), LV_PART_MAIN);
         lv_obj_set_width(name, kColName - 8);
         lv_obj_align(name, LV_ALIGN_LEFT_MID, 0, 0);
 
-        lv_obj_t *task = lv_label_create(row);
-        const char *taskText = "No task";
-        if (st.taskName[0] && bambuStateIsActive(st.state)) taskText = st.taskName;
-        else if (st.taskName[0] && st.online && st.state != BambuGcodeState::Idle) taskText = st.taskName;
-        lv_label_set_text(task, taskText);
+        task = lv_label_create(row);
         lv_label_set_long_mode(task, LV_LABEL_LONG_DOT);
         lv_obj_set_width(task, kColTask - 8);
         lv_obj_align(task, LV_ALIGN_LEFT_MID, kColName, 0);
-        lv_obj_set_style_text_font(task, PaxxTheme::fontBody(), LV_PART_MAIN);
-        lv_obj_set_style_text_color(task, PaxxTheme::muted(), LV_PART_MAIN);
 
-        char status[48];
-        int pct = -1;
-        StatusTone tone = StatusTone::Normal;
-        fillStatus(st, p, status, sizeof(status), &pct, &tone);
-
-        lv_obj_t *statusBox = lv_obj_create(row);
+        statusBox = lv_obj_create(row);
         lv_obj_set_size(statusBox, 240, PaxxTheme::rowHeight() - 8);
         lv_obj_align(statusBox, LV_ALIGN_LEFT_MID, kColName + kColTask, 0);
         lv_obj_set_style_bg_opa(statusBox, LV_OPA_TRANSP, LV_PART_MAIN);
@@ -295,22 +299,120 @@ void FleetScreen::rebuild() {
         lv_obj_set_style_pad_all(statusBox, 0, LV_PART_MAIN);
         paxx_disable_input(statusBox);
 
-        lv_obj_t *stLbl = lv_label_create(statusBox);
-        lv_label_set_text(stLbl, status);
-        lv_obj_set_style_text_font(stLbl, PaxxTheme::fontBody(), LV_PART_MAIN);
-        lv_obj_set_style_text_color(stLbl, statusToneColor(tone), LV_PART_MAIN);
+        stLbl = lv_label_create(statusBox);
         lv_obj_align(stLbl, LV_ALIGN_TOP_LEFT, 0, 0);
 
-        if (pct >= 0 && tone == StatusTone::Progress) {
-            lv_obj_t *bar = lv_bar_create(statusBox);
-            lv_obj_set_size(bar, 220, 10);
-            lv_obj_align(bar, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-            lv_obj_set_style_bg_color(bar, lv_color_hex(0x374151), LV_PART_MAIN);
-            lv_obj_set_style_bg_color(bar, PaxxTheme::accent(), LV_PART_INDICATOR);
-            lv_bar_set_range(bar, 0, 100);
-            lv_bar_set_value(bar, pct, LV_ANIM_OFF);
+        bar = lv_bar_create(statusBox);
+        lv_obj_set_size(bar, 220, 10);
+        lv_obj_align(bar, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+        lv_obj_set_style_bg_color(bar, lv_color_hex(0x374151), LV_PART_MAIN);
+        lv_bar_set_range(bar, 0, 100);
+        lv_obj_add_flag(bar, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        name = lv_obj_get_child(row, 0);
+        task = lv_obj_get_child(row, 1);
+        statusBox = lv_obj_get_child(row, 2);
+        if (statusBox) {
+            stLbl = lv_obj_get_child(statusBox, 0);
+            bar = lv_obj_get_child(statusBox, 1);
+        }
+        if (!name || !task || !stLbl || !bar) return;
+    }
+
+    lv_obj_set_style_text_font(name, PaxxTheme::fontBody(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(name, PaxxTheme::text(), LV_PART_MAIN);
+    lv_label_set_text(name, p.name[0] ? p.name : "Printer");
+
+    const char *taskText = "No task";
+    if (st.taskName[0] && bambuStateIsActive(st.state)) taskText = st.taskName;
+    else if (st.taskName[0] && st.online && st.state != BambuGcodeState::Idle) taskText = st.taskName;
+    lv_obj_set_style_text_font(task, PaxxTheme::fontBody(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(task, PaxxTheme::muted(), LV_PART_MAIN);
+    lv_label_set_text(task, taskText);
+
+    char status[48];
+    int pct = -1;
+    StatusTone tone = StatusTone::Normal;
+    fillStatus(st, p, status, sizeof(status), &pct, &tone);
+    lv_obj_set_style_text_font(stLbl, PaxxTheme::fontBody(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(stLbl, statusToneColor(tone), LV_PART_MAIN);
+    lv_label_set_text(stLbl, status);
+
+    lv_obj_set_style_bg_color(bar, PaxxTheme::accent(), LV_PART_INDICATOR);
+    if (pct >= 0 && tone == StatusTone::Progress) {
+        lv_obj_remove_flag(bar, LV_OBJ_FLAG_HIDDEN);
+        lv_bar_set_value(bar, pct, LV_ANIM_OFF);
+    } else {
+        lv_obj_add_flag(bar, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+bool FleetScreen::reorderRows(int n) {
+    if (!list_ || n <= 0) return false;
+    const uint32_t childCount = lv_obj_get_child_count(list_);
+    if (static_cast<int>(childCount) != n) return false;
+    lv_obj_t *rows[BAMBU_MAX_PRINTERS] = {};
+    for (int r = 0; r < n; ++r) {
+        for (uint32_t c = 0; c < childCount; ++c) {
+            lv_obj_t *ch = lv_obj_get_child(list_, c);
+            const int idx = static_cast<int>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(ch)));
+            if (idx == order_[r]) {
+                rows[r] = ch;
+                break;
+            }
+        }
+        if (!rows[r]) return false;
+    }
+    for (int r = 0; r < n; ++r) lv_obj_move_to_index(rows[r], r);
+    return true;
+}
+
+void FleetScreen::rebuild(bool force) {
+    if (!list_ || !app_) return;
+
+    int count = 0;
+    int n = 0;
+    BambuFleet::instance().snapshot(profiles_, live_, &count);
+    BambuFleet::instance().sortedIndexes(order_, &n, app_->config().fleetSort);
+    if (n > count) n = count;
+
+    const bool interacting = fleetListGestureActive(list_);
+    const int32_t scrollY = lv_obj_get_scroll_y(list_);
+    const bool orderChanged = fleetOrderChanged(builtOrder_, order_, n);
+    FleetListPlan plan = fleetListPlan(builtCount_, n, orderChanged, interacting, scrollY, force);
+    if (plan == FleetListPlan::Reorder && !reorderRows(n)) plan = FleetListPlan::Rebuild;
+
+    if (plan == FleetListPlan::Rebuild) {
+        lv_obj_clean(list_);
+        if (n == 0) {
+            fleetShowEmpty(list_);
+        } else {
+            for (int r = 0; r < n; ++r) {
+                paintRow(lv_button_create(list_), order_[r], r, true);
+            }
+        }
+        lv_obj_update_layout(list_);
+        lv_obj_scroll_to_y(list_, scrollY, LV_ANIM_OFF);
+        builtCount_ = n;
+        if (n > 0) memcpy(builtOrder_, order_, static_cast<size_t>(n) * sizeof(order_[0]));
+        return;
+    }
+
+    if (n > 0) {
+        const uint32_t childCount = lv_obj_get_child_count(list_);
+        if (static_cast<int>(childCount) != n) {
+            rebuild(true);
+            return;
+        }
+        const int *src = fleetPaintOrder(plan, orderChanged, builtOrder_, order_);
+        for (int r = 0; r < n; ++r) {
+            paintRow(lv_obj_get_child(list_, r), src[r], r, false);
+        }
+        if (fleetCommitOrder(plan, orderChanged)) {
+            memcpy(builtOrder_, order_, static_cast<size_t>(n) * sizeof(order_[0]));
         }
     }
+    builtCount_ = n;
 }
 
 namespace {
@@ -1373,6 +1475,7 @@ void SettingsScreen::create(CupboardApp *app, lv_obj_t *parent) {
                       "PandaTouch / K-Touch farm dashboard for Bambu Lab and Klipper.\n\n"
                       "Created by TechJeeper Designs\n\n"
                       "Latest Changes\n"
+                      "- Smoother farm list scrolling with more than 8 printers\n"
                       "- Klipper printers via Moonraker HTTP\n"
                       "- Choose Bambu Lab or Klipper before setup\n"
                       "- Existing printers stay Bambu Lab after upgrade\n"

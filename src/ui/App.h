@@ -18,7 +18,9 @@ public:
     lv_obj_t *root() const { return screen_; }
 
 private:
-    void rebuild();
+    void rebuild(bool force = false);
+    void paintRow(lv_obj_t *row, int printerIndex, int visualIndex, bool createWidgets);
+    bool reorderRows(int n);
     static void onSortName(lv_event_t *e);
     static void onSortStatus(lv_event_t *e);
 
@@ -31,9 +33,11 @@ private:
     lv_obj_t *nameHdr_ = nullptr;
     lv_obj_t *statusHdr_ = nullptr;
     uint32_t lastUiMs_ = 0;
+    int builtCount_ = -1;
     PrinterProfile profiles_[BAMBU_MAX_PRINTERS]{};
     PrinterLive live_[BAMBU_MAX_PRINTERS]{};
     int order_[BAMBU_MAX_PRINTERS]{};
+    int builtOrder_[BAMBU_MAX_PRINTERS]{};
 };
 
 class DetailScreen {
