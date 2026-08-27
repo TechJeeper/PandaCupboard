@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #ifndef PANDACUPBOARD_VERSION
-#define PANDACUPBOARD_VERSION "0.3.2"
+#define PANDACUPBOARD_VERSION "0.3.3"
 #endif
 
 static constexpr int BAMBU_MAX_PRINTERS = 24;

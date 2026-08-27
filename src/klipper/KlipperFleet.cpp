@@ -96,6 +96,11 @@ void KlipperFleet::begin(AppConfig *cfg) {
 
 void KlipperFleet::reload() { reloadRequested_ = true; }
 
+void KlipperFleet::setPaused(bool paused) {
+    paused_ = paused;
+    pauseIdle_ = false;
+}
+
 void KlipperFleet::forgetPrinter(int index) {
     if (index < 0 || index >= BAMBU_MAX_PRINTERS) return;
     if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(200)) == pdTRUE) {
@@ -189,6 +194,43 @@ int KlipperFleet::nextConfigured(int from) const {
     if (bestAny >= 0) return bestAny;
     if (fallback >= 0) return fallback;
     return (from + 1) % n;
+}
+
+void KlipperFleet::requestRefresh() {
+    if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
+        for (int i = 0; i < BAMBU_MAX_PRINTERS; ++i) {
+            skipUntilMs_[i] = 0;
+            failStreak_[i] = 0;
+        }
+        xSemaphoreGive(lock_);
+    }
+    refreshVisited_ = 0;
+    refreshSweep_ = true;
+    const int start = nextRefreshIndex();
+    if (start >= 0) pollIndex_ = start;
+    Serial.printf("[Klipper] refresh sweep start=%d\n", pollIndex_);
+}
+
+int KlipperFleet::nextRefreshIndex() const {
+    const int n = cfg_ ? cfg_->printerCount : 0;
+    int firstOther = -1;
+    for (int i = 0; i < n; ++i) {
+        if (!printerReady(i)) continue;
+        if (refreshVisited_ & (1u << i)) continue;
+        PrinterProfile profile{};
+        PrinterLive live{};
+        if (BambuFleet::instance().getPrinter(i, &profile, &live) && bambuStateIsActive(live.state)) {
+            return i;
+        }
+        if (firstOther < 0) firstOther = i;
+    }
+    return firstOther;
+}
+
+void KlipperFleet::noteRefreshVisited(int index) {
+    if (!refreshSweep_ || index < 0 || index >= BAMBU_MAX_PRINTERS) return;
+    refreshVisited_ |= (1u << index);
+    if (nextRefreshIndex() < 0) refreshSweep_ = false;
 }
 
 bool KlipperFleet::sendPrintCommand(int index, const char *command) {
@@ -385,6 +427,13 @@ bool KlipperFleet::pollPrinter(int index) {
 
 void KlipperFleet::taskLoop() {
     for (;;) {
+        if (paused_) {
+            pauseIdle_ = true;
+            vTaskDelay(pdMS_TO_TICKS(50));
+            continue;
+        }
+        pauseIdle_ = false;
+
         if (reloadRequested_) reloadRequested_ = false;
         flushPendingCommand();
 
@@ -394,10 +443,20 @@ void KlipperFleet::taskLoop() {
         }
 
         const int focus = BambuFleet::instance().focus();
-        if (focus >= 0 && printerReady(focus)) pollIndex_ = focus;
-        else pollIndex_ = nextConfigured(pollIndex_);
+        if (refreshSweep_) {
+            const int next = nextRefreshIndex();
+            if (next >= 0) pollIndex_ = next;
+            else {
+                refreshSweep_ = false;
+                pollIndex_ = nextConfigured(pollIndex_);
+            }
+        } else if (focus >= 0 && printerReady(focus)) {
+            pollIndex_ = focus;
+        } else {
+            pollIndex_ = nextConfigured(pollIndex_);
+        }
 
-        if (!printerReady(pollIndex_) || inBackoff(pollIndex_)) {
+        if (!printerReady(pollIndex_) || (!refreshSweep_ && inBackoff(pollIndex_))) {
             vTaskDelay(pdMS_TO_TICKS(80));
             continue;
         }
@@ -405,13 +464,14 @@ void KlipperFleet::taskLoop() {
         PrinterProfile profile{};
         PrinterLive live{};
         const bool focused = focus == pollIndex_;
-        if (BambuFleet::instance().getPrinter(pollIndex_, &profile, &live) &&
+        if (!refreshSweep_ && BambuFleet::instance().getPrinter(pollIndex_, &profile, &live) &&
             !dueForPoll(live, millis(), focused) && pendingIndex_ != pollIndex_) {
             vTaskDelay(pdMS_TO_TICKS(80));
             continue;
         }
 
         pollPrinter(pollIndex_);
+        if (refreshSweep_) noteRefreshVisited(pollIndex_);
         vTaskDelay(pdMS_TO_TICKS(40));
     }
 }

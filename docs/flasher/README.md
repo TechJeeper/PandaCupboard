@@ -22,10 +22,10 @@ https://pandafarm.techjeeper.com/flasher/
 ## Creating a flashable release
 
 ```powershell
-.\scripts\package-firmware.ps1 -Version "0.3.2"
+.\scripts\package-firmware.ps1 -Version "0.3.3"
 ```
 
-Upload the files from `dist/firmware/` as assets on a GitHub Release tagged `v0.3.2`:
+Upload the files from `dist/firmware/` as assets on a GitHub Release tagged `v0.3.3`:
 
 | Asset | Flash offset |
 |-------|----------------|

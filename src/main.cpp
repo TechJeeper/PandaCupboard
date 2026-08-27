@@ -10,6 +10,7 @@ void setup() {
     Serial.begin(115200);
     delay(400);
     Serial.println("PandaFarm boot");
+    WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(WIFI_PS_NONE);
     esp_wifi_set_ps(WIFI_PS_NONE);

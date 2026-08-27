@@ -18,6 +18,7 @@ public:
     void reload();
     void forgetPrinter(int index);
     void requestImmediate();
+    void requestRefresh();
 
     int count() const;
     bool getPrinter(int index, PrinterProfile *profile, PrinterLive *live) const;
@@ -25,6 +26,8 @@ public:
     void sortedIndexes(int *outIdx, int *outCount, FleetSort sort) const;
     void setFocus(int index);
     int focus() const { return focusIndex_; }
+    void setPaused(bool paused);
+    bool isPauseIdle() const { return !paused_ || pauseIdle_; }
     bool sendPrintCommand(int index, const char *command);
     bool reprintLast(int index);
     void applyExternalLive(int index, const PrinterLive &live);
@@ -52,6 +55,8 @@ private:
     bool hasReadyPrinter() const;
     bool inBackoff(int index) const;
     void noteConnectResult(int index, bool ok);
+    int nextRefreshIndex() const;
+    void noteRefreshVisited(int index);
 
     AppConfig *cfg_ = nullptr;
     BambuDiscovery *discovery_ = nullptr;
@@ -75,8 +80,12 @@ private:
     bool gotStatus_ = false;
     bool started_ = false;
     bool sessionOpen_ = false;
+    volatile bool paused_ = false;
+    volatile bool pauseIdle_ = false;
     volatile bool forceDisconnect_ = false;
     char sessionIp_[16] = {};
     uint32_t skipUntilMs_[BAMBU_MAX_PRINTERS] = {};
     uint8_t failStreak_[BAMBU_MAX_PRINTERS] = {};
+    volatile bool refreshSweep_ = false;
+    uint32_t refreshVisited_ = 0;
 };

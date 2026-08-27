@@ -13,6 +13,8 @@ struct WifiNetwork {
 
 using WifiStatusCallback = std::function<void(bool connected, const char *message)>;
 using WifiScanCallback = std::function<void(const std::vector<WifiNetwork> &)>;
+using WifiVoidCallback = std::function<void()>;
+using WifiReadyCallback = std::function<bool()>;
 
 class WifiService {
 public:
@@ -23,32 +25,47 @@ public:
     bool isConnected() const { return WiFi.status() == WL_CONNECTED; }
     const char *localIp() const;
     void startScan();
-    bool isScanning() const { return scanRunning_; }
-    bool isReconnectAfterScan() const { return reconnectAfterScan_; }
+    bool isScanning() const { return scanPhase_ != ScanPhase::Idle; }
     void forgetAll();
     void setStatusCallback(WifiStatusCallback cb) { statusCb_ = std::move(cb); }
     void setScanCallback(WifiScanCallback cb) { scanCb_ = std::move(cb); }
+    void setScanLifecycle(WifiVoidCallback pause, WifiVoidCallback resume, WifiReadyCallback idle);
     void loop();
 
 private:
+    enum class ScanPhase : uint8_t { Idle, Pausing, Dropping, Scanning, Gap };
+
     void finishConnect(bool ok, const char *message);
     void abortScan();
+    void pauseClients();
+    void resumeClients();
     void beginAsyncScan();
-    void finishScan(int n);
+    void takeScanResults();
+    void finishScanPasses();
+    void resumeStation();
     void rememberCurrentNetwork();
+    static void prepareStation();
     static void collectScanResults(int n, std::vector<WifiNetwork> &out);
+    static void mergeNetworks(std::vector<WifiNetwork> &into, const std::vector<WifiNetwork> &add);
 
     WifiStatusCallback statusCb_;
     WifiScanCallback scanCb_;
+    WifiVoidCallback pauseCb_;
+    WifiVoidCallback resumeCb_;
+    WifiReadyCallback idleCb_;
+    std::vector<WifiNetwork> accumulated_;
     bool lastConnected_ = false;
     bool connectPending_ = false;
-    bool scanRunning_ = false;
     bool reconnectAfterScan_ = false;
+    bool resumeAfterConnect_ = false;
+    bool clientsPaused_ = false;
+    ScanPhase scanPhase_ = ScanPhase::Idle;
     unsigned long connectStartMs_ = 0;
     unsigned long scanStartMs_ = 0;
-    unsigned long scanArmAtMs_ = 0;
+    unsigned long phaseUntilMs_ = 0;
     int connectTimeoutSec_ = 0;
     uint8_t scanStartAttempts_ = 0;
+    uint8_t scanPass_ = 0;
     char lastSsid_[33] = {};
-    char lastPass_[64] = {};
+    char lastPass_[65] = {};
 };

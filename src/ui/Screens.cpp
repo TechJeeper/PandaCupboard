@@ -7,6 +7,7 @@
 #include "ui/Theme.h"
 
 #include <WiFi.h>
+#include <algorithm>
 #include <cstring>
 #include <vector>
 
@@ -140,6 +141,16 @@ void FleetScreen::create(CupboardApp *app, lv_obj_t *parent) {
     paxx_set_centered_icon(addBtn, LV_SYMBOL_PLUS);
     paxx_mark_accent_fill(addBtn);
     lv_obj_set_style_bg_color(addBtn, PaxxTheme::accent(), LV_PART_MAIN);
+
+    lv_obj_t *refreshBtn = lv_button_create(titleBar_);
+    lv_obj_set_size(refreshBtn, 40, 40);
+    lv_obj_align(refreshBtn, LV_ALIGN_RIGHT_MID, -104, 0);
+    lv_obj_add_event_cb(refreshBtn, [](lv_event_t *e) {
+        static_cast<CupboardApp *>(lv_event_get_user_data(e))->refreshPrinters();
+    }, LV_EVENT_CLICKED, app);
+    paxx_set_centered_icon(refreshBtn, LV_SYMBOL_REFRESH);
+    paxx_mark_accent_fill(refreshBtn);
+    lv_obj_set_style_bg_color(refreshBtn, PaxxTheme::accent(), LV_PART_MAIN);
 
     header_ = lv_obj_create(screen_);
     lv_obj_set_size(header_, LV_PCT(100), 36);
@@ -1142,6 +1153,7 @@ void WifiScreen::forgetAllNetworks() {
     scanning_ = false;
     app_->config().wifi.ssid[0] = '\0';
     app_->config().wifi.password[0] = '\0';
+    CupboardPreferences::instance().clearWifi();
     app_->saveConfig();
     app_->wifi().forgetAll();
     selectedIndex_ = -1;
@@ -1206,7 +1218,20 @@ void WifiScreen::scanNetworks() {
 void WifiScreen::onScanDone(const std::vector<WifiNetwork> &nets) {
     scanning_ = false;
     if (app_) app_->showGlobalLoading(false);
-    std::vector<WifiNetwork> shown = nets;
+    std::vector<WifiNetwork> shown = networks_;
+    for (const auto &net : nets) {
+        bool found = false;
+        for (auto &existing : shown) {
+            if (strcmp(existing.ssid, net.ssid) != 0) continue;
+            if (net.rssi > existing.rssi) existing = net;
+            found = true;
+            break;
+        }
+        if (!found) shown.push_back(net);
+    }
+    std::sort(shown.begin(), shown.end(), [](const WifiNetwork &a, const WifiNetwork &b) {
+        return a.rssi > b.rssi;
+    });
     if (shown.empty() && WiFi.isConnected()) {
         WifiNetwork cur{};
         fillCurrentNetwork(cur);

@@ -115,6 +115,47 @@ void BambuFleet::requestImmediate() {
     gotStatus_ = true;
 }
 
+void BambuFleet::requestRefresh() {
+    if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {
+        for (int i = 0; i < BAMBU_MAX_PRINTERS; ++i) {
+            skipUntilMs_[i] = 0;
+            failStreak_[i] = 0;
+        }
+        xSemaphoreGive(lock_);
+    }
+    refreshVisited_ = 0;
+    refreshSweep_ = true;
+    forceDisconnect_ = true;
+    reloadRequested_ = true;
+    const int start = nextRefreshIndex();
+    if (start >= 0) pollIndex_ = start;
+    Serial.printf("[Bambu] refresh sweep start=%d\n", pollIndex_);
+}
+
+int BambuFleet::nextRefreshIndex() const {
+    const int n = count();
+    int firstOther = -1;
+    for (int i = 0; i < n; ++i) {
+        if (!printerReady(i)) continue;
+        if (refreshVisited_ & (1u << i)) continue;
+        if (bambuStateIsActive(live_[i].state)) return i;
+        if (firstOther < 0) firstOther = i;
+    }
+    return firstOther;
+}
+
+void BambuFleet::noteRefreshVisited(int index) {
+    if (!refreshSweep_ || index < 0 || index >= BAMBU_MAX_PRINTERS) return;
+    refreshVisited_ |= (1u << index);
+    if (nextRefreshIndex() < 0) refreshSweep_ = false;
+}
+
+void BambuFleet::setPaused(bool paused) {
+    paused_ = paused;
+    pauseIdle_ = false;
+    if (paused) forceDisconnect_ = true;
+}
+
 int BambuFleet::count() const {
     return cfg_ ? cfg_->printerCount : 0;
 }
@@ -284,8 +325,18 @@ int BambuFleet::nextConfigured(int from) const {
 }
 
 void BambuFleet::nextPrinter() {
+    noteRefreshVisited(pollIndex_);
     disconnectMqtt();
-    pollIndex_ = nextConfigured(pollIndex_);
+    if (refreshSweep_) {
+        const int next = nextRefreshIndex();
+        if (next >= 0) pollIndex_ = next;
+        else {
+            refreshSweep_ = false;
+            pollIndex_ = nextConfigured(pollIndex_);
+        }
+    } else {
+        pollIndex_ = nextConfigured(pollIndex_);
+    }
 }
 
 bool BambuFleet::connectMqtt(const char *ipStr, const char *accessCode, const char *name) {
@@ -612,7 +663,7 @@ void BambuFleet::handlePayload(const char *topic, const uint8_t *payload, unsign
 void BambuFleet::persistPendingSerial() {
     if (!serialDirty_ || !cfg_) return;
     serialDirty_ = false;
-    CupboardPreferences::instance().save(*cfg_);
+    CupboardPreferences::instance().savePrinters(*cfg_);
 }
 
 void BambuFleet::loop() {
@@ -636,6 +687,14 @@ void BambuFleet::taskLoop() {
 
     for (;;) {
         persistPendingSerial();
+
+        if (paused_) {
+            if (sessionOpen_ || (mqtt_ && mqtt_->connected())) disconnectMqtt();
+            pauseIdle_ = true;
+            vTaskDelay(pdMS_TO_TICKS(50));
+            continue;
+        }
+        pauseIdle_ = false;
 
         if (focusIndex_ >= 0 && focusIndex_ < count() && pollIndex_ != focusIndex_ &&
             printerReady(focusIndex_)) {
@@ -694,14 +753,15 @@ void BambuFleet::taskLoop() {
         const uint32_t now = millis();
         const bool focused = focusIndex_ >= 0;
         const int n = count();
-        const bool stayOnPrinter = focused || n <= 1;
+        const bool stayOnPrinter = !refreshSweep_ && (focused || n <= 1);
         if (cfg_->printers[pollIndex_].serial[0] && now - lastPushMs_ > (stayOnPrinter ? 8000 : 2500) &&
             (stayOnPrinter || !gotStatus_)) {
             requestPushAll(cfg_->printers[pollIndex_].serial);
         }
 
         const bool timedOut = !gotStatus_ && now - connectStartMs_ > 8000;
-        const bool rotate = !stayOnPrinter && gotStatus_ && now - connectStartMs_ > 1100;
+        const bool rotate = refreshSweep_ ? gotStatus_
+                                         : (!stayOnPrinter && gotStatus_ && now - connectStartMs_ > 1100);
         if (timedOut) {
             Serial.println("[Bambu] no gcode_state after 8s");
             if (lock_ && xSemaphoreTake(lock_, pdMS_TO_TICKS(50)) == pdTRUE) {

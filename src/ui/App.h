@@ -244,6 +244,7 @@ public:
     void savePrinterFromSetup();
     void startDiscovery();
     void mergeDiscoveredPrinters();
+    void refreshPrinters();
 
     void showFleet();
     void showPrinter(int index);

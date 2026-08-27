@@ -34,6 +34,9 @@ void CupboardApp::begin() {
         }
         if (connected) {
             wifiLostAtMs_ = 0;
+            if (config_.wifi.ssid[0]) {
+                CupboardPreferences::instance().saveWifi(config_.wifi);
+            }
             discovery_.begin();
             if (wifiScreen_.shouldLeaveOnConnect() && activeScreen_ == wifiScreen_.root()) {
                 if (CupboardPreferences::instance().hasPrinter()) showFleet();
@@ -46,6 +49,18 @@ void CupboardApp::begin() {
     wifi_.setScanCallback([this](const std::vector<WifiNetwork> &nets) {
         wifiScreen_.onScanDone(nets);
     });
+    wifi_.setScanLifecycle(
+        [] {
+            BambuFleet::instance().setPaused(true);
+            KlipperFleet::instance().setPaused(true);
+        },
+        [] {
+            BambuFleet::instance().setPaused(false);
+            KlipperFleet::instance().setPaused(false);
+        },
+        [] {
+            return BambuFleet::instance().isPauseIdle() && KlipperFleet::instance().isPauseIdle();
+        });
 
     if (CupboardPreferences::instance().hasWifi()) {
         wifi_.startConnect(config_.wifi.ssid, config_.wifi.password, 15);
@@ -191,6 +206,13 @@ void CupboardApp::savePrinterFromSetup() {
 void CupboardApp::startDiscovery() {
     discovery_.startScan(4500);
     PaxxNotify::show("Discover", "Searching LAN for Bambu printers...");
+}
+
+void CupboardApp::refreshPrinters() {
+    BambuFleet::instance().requestRefresh();
+    KlipperFleet::instance().requestRefresh();
+    discovery_.startScan(4500);
+    PaxxNotify::show("Farm", "Refreshing printers");
 }
 
 void CupboardApp::mergeDiscoveredPrinters() {
