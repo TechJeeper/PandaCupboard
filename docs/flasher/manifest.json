@@ -1,6 +1,6 @@
 {
   "name": "PandaFarm",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Bambu Lab and Klipper farm dashboard for BTT K-Touch / PandaTouch — Studio-style farm list with pause, resume, stop, and LAN status",
   "chip": "ESP32-S3",
   "hardware": "BTT K-Touch / PandaTouch (ESP32-S3, 8 MB PSRAM)",

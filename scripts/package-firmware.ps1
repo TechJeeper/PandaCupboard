@@ -1,8 +1,8 @@
 # Package PandaFarm build artifacts for GitHub Releases + web flasher.
-# Usage: .\scripts\package-firmware.ps1 [-Version "0.3.1"]
+# Usage: .\scripts\package-firmware.ps1 [-Version "0.3.2"]
 
 param(
-    [string]$Version = "0.3.1",
+    [string]$Version = "0.3.2",
     [string]$Env = "pandacupboard-arduino-3x"
 )
 

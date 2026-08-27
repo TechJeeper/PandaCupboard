@@ -144,6 +144,18 @@ lv_obj_t *paxx_create_nav_bar(lv_obj_t *parent, const char *title, lv_event_cb_t
     return bar;
 }
 
+lv_obj_t *paxx_create_nav_save_btn(lv_obj_t *nav, lv_event_cb_t cb, void *userData) {
+    if (!nav) return nullptr;
+    lv_obj_t *btn = lv_button_create(nav);
+    lv_obj_set_size(btn, 40, 32);
+    lv_obj_align(btn, LV_ALIGN_LEFT_MID, 80, 0);
+    lv_obj_set_style_bg_color(btn, PaxxTheme::accent(), LV_PART_MAIN);
+    paxx_mark_accent_fill(btn);
+    if (cb) lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, userData);
+    paxx_set_centered_icon(btn, LV_SYMBOL_SAVE);
+    return btn;
+}
+
 lv_obj_t *paxx_create_status_chip(lv_obj_t *parent, const char *label, lv_color_t color) {
     lv_obj_t *chip = lv_obj_create(parent);
     lv_obj_set_size(chip, LV_SIZE_CONTENT, LV_SIZE_CONTENT);

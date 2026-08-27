@@ -142,16 +142,20 @@ public:
     void create(CupboardApp *app, lv_obj_t *parent);
     void onEnter();
     void scanNetworks();
+    void onScanDone(const std::vector<WifiNetwork> &nets);
     void forgetAllNetworks();
     void connectSelected();
     void setStatus(const char *text);
     bool isScanning() const { return scanning_; }
+    bool shouldLeaveOnConnect() const { return leaveOnConnect_; }
     lv_obj_t *passInput() const { return passTa_; }
     lv_obj_t *root() const { return screen_; }
 
 private:
     void applyNetworkList(const std::vector<WifiNetwork> &nets);
     void selectNetwork(size_t index);
+    void fillCurrentNetwork(WifiNetwork &out) const;
+    void showConnectedNetwork();
     void updateNavBack();
 
     CupboardApp *app_ = nullptr;
@@ -163,6 +167,7 @@ private:
     std::vector<WifiNetwork> networks_;
     int selectedIndex_ = -1;
     bool scanning_ = false;
+    bool leaveOnConnect_ = false;
 };
 
 class ThemeScreen {

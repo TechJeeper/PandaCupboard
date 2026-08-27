@@ -774,7 +774,10 @@ void SetupScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(screen_, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(screen_, 0, LV_PART_MAIN);
     paxx_style_form_screen(screen_);
-    paxx_create_nav_bar(screen_, "Printer Setup", farm_back_fleet_cb, app, true);
+    lv_obj_t *nav = paxx_create_nav_bar(screen_, "Printer Setup", farm_back_fleet_cb, app, true);
+    saveBtn_ = paxx_create_nav_save_btn(nav, [](lv_event_t *e) {
+        static_cast<CupboardApp *>(lv_event_get_user_data(e))->savePrinterFromSetup();
+    }, app);
 
     typeLbl_ = lv_label_create(screen_);
     paxx_set_form_width(typeLbl_);
@@ -814,15 +817,7 @@ void SetupScreen::create(CupboardApp *app, lv_obj_t *parent) {
 
     discoverList_ = lv_list_create(screen_);
     paxx_set_form_width(discoverList_);
-    lv_obj_set_height(discoverList_, 90);
-
-    saveBtn_ = lv_button_create(screen_);
-    paxx_set_form_width(saveBtn_);
-    lv_obj_set_height(saveBtn_, 44);
-    lv_obj_add_event_cb(saveBtn_, [](lv_event_t *e) {
-        static_cast<CupboardApp *>(lv_event_get_user_data(e))->savePrinterFromSetup();
-    }, LV_EVENT_CLICKED, app);
-    lv_label_set_text(lv_label_create(saveBtn_), "Save printer");
+    lv_obj_set_height(discoverList_, 132);
 }
 
 void SetupScreen::applyTypeLayout() {
@@ -866,8 +861,7 @@ void SetupScreen::applyTypeLayout() {
     place(serialTa_, !klipper, 48);
     place(hintLbl_, true, 40);
     place(scanBtn_, !klipper, 48);
-    place(discoverList_, !klipper, 100);
-    place(saveBtn_, true, 48);
+    place(discoverList_, !klipper, 140);
 }
 
 void SetupScreen::loadFromEdit() {
@@ -1042,7 +1036,10 @@ void WifiScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(screen_, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(screen_, 0, LV_PART_MAIN);
     paxx_style_form_screen(screen_);
-    paxx_create_nav_bar(screen_, "WiFi Setup", farm_back_fleet_cb, app, true, &navBackBtn_);
+    lv_obj_t *nav = paxx_create_nav_bar(screen_, "WiFi Setup", farm_back_fleet_cb, app, true, &navBackBtn_);
+    paxx_create_nav_save_btn(nav, [](lv_event_t *e) {
+        static_cast<CupboardApp *>(lv_event_get_user_data(e))->wifiScreen().connectSelected();
+    }, app);
 
     statusLbl_ = lv_label_create(screen_);
     paxx_set_form_width(statusLbl_);
@@ -1105,6 +1102,8 @@ void WifiScreen::selectNetwork(size_t index) {
     selectedIndex_ = static_cast<int>(index);
     const WifiNetwork &net = networks_[index];
     if (!net.secure) {
+        scanning_ = false;
+        leaveOnConnect_ = true;
         PaxxKeyboard::hide();
         strlcpy(app_->config().wifi.ssid, net.ssid, sizeof(app_->config().wifi.ssid));
         app_->config().wifi.password[0] = '\0';
@@ -1127,6 +1126,8 @@ void WifiScreen::connectSelected() {
         setStatus("Tap a network first");
         return;
     }
+    scanning_ = false;
+    leaveOnConnect_ = true;
     const WifiNetwork &net = networks_[static_cast<size_t>(selectedIndex_)];
     PaxxKeyboard::hide();
     strlcpy(app_->config().wifi.ssid, net.ssid, sizeof(app_->config().wifi.ssid));
@@ -1138,6 +1139,7 @@ void WifiScreen::connectSelected() {
 }
 
 void WifiScreen::forgetAllNetworks() {
+    scanning_ = false;
     app_->config().wifi.ssid[0] = '\0';
     app_->config().wifi.password[0] = '\0';
     app_->saveConfig();
@@ -1151,24 +1153,72 @@ void WifiScreen::forgetAllNetworks() {
     PaxxNotify::show("WiFi", "Saved networks cleared");
 }
 
+void WifiScreen::fillCurrentNetwork(WifiNetwork &out) const {
+    memset(&out, 0, sizeof(out));
+    strlcpy(out.ssid, WiFi.SSID().c_str(), sizeof(out.ssid));
+    if (!out.ssid[0] && app_) strlcpy(out.ssid, app_->config().wifi.ssid, sizeof(out.ssid));
+    out.rssi = WiFi.RSSI();
+    out.secure = !app_ || app_->config().wifi.password[0] != '\0';
+}
+
+void WifiScreen::showConnectedNetwork() {
+    WifiNetwork cur{};
+    fillCurrentNetwork(cur);
+    const String ip = WiFi.localIP().toString();
+    char buf[96];
+    if (cur.ssid[0]) snprintf(buf, sizeof(buf), "Connected to %s  (%s)", cur.ssid, ip.c_str());
+    else snprintf(buf, sizeof(buf), "Connected  (%s)", ip.c_str());
+    if (cur.ssid[0]) applyNetworkList({cur});
+    else applyNetworkList({});
+    setStatus(buf);
+}
+
 void WifiScreen::onEnter() {
     selectedIndex_ = -1;
+    leaveOnConnect_ = false;
     lv_textarea_set_text(passTa_, "");
-    if (WiFi.isConnected()) setStatus(WiFi.localIP().toString().c_str());
-    else setStatus("Scanning...");
-    lv_async_call([](void *p) { static_cast<WifiScreen *>(p)->scanNetworks(); }, this);
+    if (app_->wifi().isConnectPending()) {
+        setStatus("Connecting...");
+        app_->showGlobalLoading(true, "Connecting to WiFi...");
+        return;
+    }
+    if (WiFi.isConnected()) {
+        showConnectedNetwork();
+        return;
+    }
+    setStatus("Scanning...");
+    scanNetworks();
 }
 
 void WifiScreen::scanNetworks() {
+    if (scanning_ && app_->wifi().isScanning()) return;
+    leaveOnConnect_ = false;
     scanning_ = true;
     app_->showGlobalLoading(true, "Scanning WiFi...");
     setStatus("Scanning...");
-    paxx_ui_refresh();
-    std::vector<WifiNetwork> nets;
-    app_->wifi().scan(nets);
+    app_->wifi().startScan();
+    if (!app_->wifi().isScanning()) {
+        scanning_ = false;
+        app_->showGlobalLoading(false);
+    }
+}
+
+void WifiScreen::onScanDone(const std::vector<WifiNetwork> &nets) {
     scanning_ = false;
-    app_->showGlobalLoading(false);
-    applyNetworkList(nets);
+    if (app_) app_->showGlobalLoading(false);
+    std::vector<WifiNetwork> shown = nets;
+    if (shown.empty() && WiFi.isConnected()) {
+        WifiNetwork cur{};
+        fillCurrentNetwork(cur);
+        if (cur.ssid[0]) shown.push_back(cur);
+        applyNetworkList(shown);
+        char buf[96];
+        snprintf(buf, sizeof(buf), "Connected to %s — scan found no other networks",
+                 cur.ssid[0] ? cur.ssid : "WiFi");
+        setStatus(buf);
+        return;
+    }
+    applyNetworkList(shown);
 }
 
 void WifiScreen::applyNetworkList(const std::vector<WifiNetwork> &nets) {
@@ -1475,6 +1525,9 @@ void SettingsScreen::create(CupboardApp *app, lv_obj_t *parent) {
                       "PandaTouch / K-Touch farm dashboard for Bambu Lab and Klipper.\n\n"
                       "Created by TechJeeper Designs\n\n"
                       "Latest Changes\n"
+                      "- Save icon next to Back on Printer Setup and WiFi Setup\n"
+                      "- WiFi Setup no longer reboots the panel when opened\n"
+                      "- Scan again finds nearby networks without freezing\n"
                       "- Smoother farm list scrolling with more than 8 printers\n"
                       "- Klipper printers via Moonraker HTTP\n"
                       "- Choose Bambu Lab or Klipper before setup\n"

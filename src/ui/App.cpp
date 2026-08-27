@@ -24,7 +24,10 @@ void CupboardApp::begin() {
 
     wifi_.setStatusCallback([this](bool connected, const char *message) {
         if (activeScreen_ == wifiScreen_.root()) {
-            if (message && message[0]) wifiScreen_.setStatus(message);
+            const bool joining = wifiScreen_.shouldLeaveOnConnect();
+            if (message && message[0] && !wifiScreen_.isScanning() && (joining || (!connected && !wifi_.isConnectPending()))) {
+                wifiScreen_.setStatus(message);
+            }
             if (!wifi_.isConnectPending() && !wifiScreen_.isScanning()) {
                 showGlobalLoading(false);
             }
@@ -32,14 +35,16 @@ void CupboardApp::begin() {
         if (connected) {
             wifiLostAtMs_ = 0;
             discovery_.begin();
-            if (CupboardPreferences::instance().hasPrinter() && activeScreen_ == wifiScreen_.root()) {
-                showFleet();
-            } else if (!CupboardPreferences::instance().hasPrinter() && activeScreen_ == wifiScreen_.root()) {
-                showPrinterType();
+            if (wifiScreen_.shouldLeaveOnConnect() && activeScreen_ == wifiScreen_.root()) {
+                if (CupboardPreferences::instance().hasPrinter()) showFleet();
+                else showPrinterType();
             }
-        } else if (!wifi_.isConnectPending()) {
+        } else if (!wifi_.isConnectPending() && !wifi_.isScanning()) {
             wifiLostAtMs_ = millis();
         }
+    });
+    wifi_.setScanCallback([this](const std::vector<WifiNetwork> &nets) {
+        wifiScreen_.onScanDone(nets);
     });
 
     if (CupboardPreferences::instance().hasWifi()) {
