@@ -40,7 +40,7 @@
     "name": "PandaFarm",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "BIGTREETECH Panda Touch, BIGTREETECH K-Touch",
-    "softwareVersion": "0.3.3",
+    "softwareVersion": "0.3.4",
     "url": "https://pandafarm.techjeeper.com/",
     "downloadUrl": "https://pandafarm.techjeeper.com/flasher/",
     "image": "https://pandafarm.techjeeper.com/flasher/screen1.jpg",
@@ -108,6 +108,14 @@
           <figcaption>Printer detail</figcaption>
         </figure>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>v0.3.4 — Bambu MQTT that actually connects</h2>
+      <p style="color:var(--muted);margin:0 0 12px">
+        Bambu printers no longer show MQTT unreachable when the IP and LAN access code are correct.
+        The panel was running out of RAM during the encrypted MQTT handshake; that handshake now uses PSRAM so local MQTT works while idle and while printing.
+      </p>
     </section>
 
     <section class="card">

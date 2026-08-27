@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <cstring>
+#include <esp_heap_caps.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/x509_crt.h>
 
@@ -13,7 +14,7 @@ BambuFleet *gFleet = nullptr;
 const char *mqttFailReason(int rc) {
     if (rc == 4 || rc == 5) return "Bad access code";
     if (rc == -4) return "MQTT timeout";
-    if (rc == -2) return "Wrong IP / MQTT closed";
+    if (rc == -2) return "MQTT 8883 unreachable";
     return "MQTT unreachable";
 }
 
@@ -46,7 +47,7 @@ constexpr uint32_t kIdlePollMs = 25000;
 
 bool dueForPoll(const PrinterLive &live, uint32_t now) {
     if (!live.lastSeenMs) return true;
-    if (bambuStateIsActive(live.state)) return true;
+    if (live.online && bambuStateIsActive(live.state)) return true;
     return (now - live.lastSeenMs) >= kIdlePollMs;
 }
 
@@ -84,7 +85,7 @@ void BambuFleet::begin(AppConfig *cfg, BambuDiscovery *discovery) {
         // Core 1 is the Arduino loop core. Core 0 runs the WiFi/LwIP stack;
         // TLS + MQTT there races WiFi connect and trips the task watchdog.
         const BaseType_t core = 1;
-        xTaskCreatePinnedToCore(taskThunk, "bambuMqtt", 24576, this, 1, &task_, core);
+        xTaskCreatePinnedToCore(taskThunk, "bambuMqtt", 16384, this, 1, &task_, core);
     }
 }
 
@@ -138,7 +139,7 @@ int BambuFleet::nextRefreshIndex() const {
     for (int i = 0; i < n; ++i) {
         if (!printerReady(i)) continue;
         if (refreshVisited_ & (1u << i)) continue;
-        if (bambuStateIsActive(live_[i].state)) return i;
+        if (live_[i].online && bambuStateIsActive(live_[i].state)) return i;
         if (firstOther < 0) firstOther = i;
     }
     return firstOther;
@@ -341,18 +342,54 @@ void BambuFleet::nextPrinter() {
 
 bool BambuFleet::connectMqtt(const char *ipStr, const char *accessCode, const char *name) {
     IPAddress ip;
-    if (!ip.fromString(ipStr)) return false;
-    mqtt_->setServer(ip, BAMBU_MQTT_PORT);
+    if (!ip.fromString(ipStr) || !mqtt_ || !tls_) return false;
+    if (sessionOpen_ || mqtt_->connected()) disconnectMqtt();
+
+    WiFiClient probe;
+    probe.setTimeout(4000);
+    const bool tcpOk = probe.connect(ip, BAMBU_MQTT_PORT);
+    Serial.printf("[Bambu] tcp %s:8883 -> %d panel=%s heap=%u intern=%u psram=%u\n", ipStr, tcpOk ? 1 : 0,
+                  WiFi.localIP().toString().c_str(), static_cast<unsigned>(ESP.getFreeHeap()),
+                  static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                  static_cast<unsigned>(ESP.getFreePsram()));
+    probe.stop();
+    if (!tcpOk) return false;
+
+    vTaskDelay(pdMS_TO_TICKS(150));
+    tls_->setInsecure();
+    tls_->setHandshakeTimeout(45000);
+    tls_->setTimeout(20000);
+    mqtt_->setSocketTimeout(15);
+    mqtt_->setServer(ipStr, BAMBU_MQTT_PORT);
+
     char clientId[40];
     snprintf(clientId, sizeof(clientId), "PandaFarm-%04X-%d", (unsigned)(ESP.getEfuseMac() & 0xFFFF), pollIndex_);
-    Serial.printf("[Bambu] MQTT %s @ %s sn=%s\n", name, ipStr,
+    Serial.printf("[Bambu] MQTT %s @ %s:8883 user=bblp sn=%s\n", name, ipStr,
                   cfg_->printers[pollIndex_].serial[0] ? cfg_->printers[pollIndex_].serial : "(none)");
     sessionOpen_ = true;
-    if (mqtt_->connect(clientId, "bblp", accessCode)) {
+    bool ok = mqtt_->connect(clientId, "bblp", accessCode);
+    if (!ok && mqtt_->state() == -2) {
+        char err[96] = {};
+        tls_->lastError(err, sizeof(err));
+        Serial.printf("[Bambu] TLS retry %s rc=%d tls=\"%s\" heap=%u\n", ipStr, mqtt_->state(), err,
+                      static_cast<unsigned>(ESP.getFreeHeap()));
+        tls_->stop();
+        sessionOpen_ = false;
+        vTaskDelay(pdMS_TO_TICKS(400));
+        sessionOpen_ = true;
+        ok = mqtt_->connect(clientId, "bblp", accessCode);
+    }
+    if (ok) {
+        if (!mqtt_->setBufferSize(BAMBU_MQTT_BUFFER) && !mqtt_->setBufferSize(16384)) {
+            Serial.println("[Bambu] MQTT buffer alloc failed after TLS");
+        }
         strlcpy(sessionIp_, ipStr, sizeof(sessionIp_));
         return true;
     }
-    Serial.printf("[Bambu] connect failed rc=%d host=%s\n", mqtt_->state(), ipStr);
+    char err[96] = {};
+    tls_->lastError(err, sizeof(err));
+    Serial.printf("[Bambu] connect failed rc=%d tls=\"%s\" host=%s heap=%u\n", mqtt_->state(), err, ipStr,
+                  static_cast<unsigned>(ESP.getFreeHeap()));
     tls_->stop();
     sessionOpen_ = false;
     sessionIp_[0] = '\0';
@@ -673,15 +710,10 @@ void BambuFleet::loop() {
 void BambuFleet::taskLoop() {
     WiFiClientSecure tls;
     tls.setInsecure();
-    tls.setHandshakeTimeout(8);
-    tls.setTimeout(6000);
     PubSubClient mqtt(tls);
     mqtt.setCallback(mqttThunk);
-    if (!mqtt.setBufferSize(BAMBU_MQTT_BUFFER)) {
-        Serial.println("[Bambu] MQTT buffer alloc failed");
-    }
     mqtt.setKeepAlive(20);
-    mqtt.setSocketTimeout(6);
+    mqtt.setSocketTimeout(15);
     tls_ = &tls;
     mqtt_ = &mqtt;
 
@@ -735,7 +767,7 @@ void BambuFleet::taskLoop() {
             sessionOpen_ = false;
             if (!connectCurrent()) {
                 nextPrinter();
-                vTaskDelay(pdMS_TO_TICKS(40));
+                vTaskDelay(pdMS_TO_TICKS(250));
                 continue;
             }
         }

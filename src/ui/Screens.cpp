@@ -814,7 +814,7 @@ void SetupScreen::create(CupboardApp *app, lv_obj_t *parent) {
     lv_obj_set_style_text_color(hintLbl_, PaxxTheme::muted(), LV_PART_MAIN);
     lv_label_set_long_mode(hintLbl_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(hintLbl_, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_text(hintLbl_, "Access code is on the printer under Settings > WLAN. Cloud mode is fine — LAN Only is not required.");
+    lv_label_set_text(hintLbl_, "LAN access code is under Settings > WLAN or LAN mode. MQTT is user bblp on port 8883 with TLS.");
 
     scanBtn_ = lv_button_create(screen_);
     paxx_set_form_width(scanBtn_);
@@ -861,7 +861,7 @@ void SetupScreen::applyTypeLayout() {
         lv_label_set_text(hintLbl_,
                           klipper
                               ? "Moonraker default port is 7125. API key is optional if this panel is a trusted client."
-                              : "Access code is on the printer under Settings > WLAN. Cloud mode is fine — LAN Only is not required.");
+                              : "LAN access code is under Settings > WLAN or LAN mode. MQTT is user bblp on port 8883 with TLS.");
     }
 
     place(typeLbl_, true, 28);
